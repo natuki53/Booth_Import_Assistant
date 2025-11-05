@@ -158,23 +158,64 @@ npm install
 
 ```
 Booth_Import_Assistant/
+├── .gitignore                  # Git除外設定
+│
 ├── Bridge/                     # Node.jsローカルサーバー
-│   ├── bridge.js              # メインサーバースクリプト
-│   ├── package.json           # Node.js依存関係
-│   └── node_modules/          # npm install で生成
+│   ├── bridge.js               # メインサーバースクリプト
+│   ├── package.json            # Node.js依存関係
+│   ├── .npmrc                  # npm設定
+│   ├── README.md               # Bridge詳細ガイド
+│   └── node_modules/           # npm install で生成（.gitignore）
 │
-├── BoothExtension/            # ブラウザ拡張機能
-│   ├── manifest.json          # 拡張機能設定
-│   ├── content.js             # DOM解析・自動送信
-│   └── README.md              # インストール手順
+├── BoothExtension/             # ブラウザ拡張機能（Chrome/Edge）
+│   ├── manifest.json           # 拡張機能設定（Manifest V3）
+│   ├── content.js              # DOM解析・全ページ自動巡回
+│   ├── background.js           # ダウンロード監視（Service Worker）
+│   ├── README.md               # インストール・使用方法
+│   ├── DEBUG.md                # デバッグ方法
+│   └── ICONS_README.txt        # アイコン配置方法
 │
-├── UnityExtension/            # Unity Editor拡張
+├── UnityExtension/             # Unity Editor拡張
 │   └── Editor/
-│       ├── BridgeManager.cs       # Bridge起動・終了管理
-│       └── BoothLibraryWindow.cs  # メインUIウィンドウ
+│       ├── BridgeManager.cs            # Bridge起動・終了管理
+│       ├── BoothLibraryWindow.cs       # メインUIウィンドウ
+│       └── BoothImportAssistant.asmdef # Assembly Definition
 │
-└── README.md                  # このファイル
+├── BoothBridge/                # 実行時生成ディレクトリ（.gitignore）
+│   ├── .gitkeep                # ディレクトリ保持用
+│   ├── booth_assets.json       # 購入リストデータ（実行時生成）
+│   ├── booth_assets.backup.json # バックアップ（実行時生成）
+│   └── thumbnails/             # サムネイル画像（実行時生成）
+│
+├── Assets/ImportedAssets/      # ダウンロードアセット展開先（.gitignore）
+│   └── .gitkeep                # ディレクトリ保持用
+│       └── booth_<ID>/         # 商品IDごとのディレクトリ（実行時生成）
+│           ├── *.unitypackage  # 抽出された.unitypackage
+│           └── variant_*/      # 複数バリエーション用サブフォルダ
+│
+├── README.md                   # このファイル
+├── CHANGELOG.md                # 変更履歴
+├── INSTALL.md                  # インストール詳細ガイド
+├── MAC_SETUP.md                # Mac専用セットアップガイド
+├── PAGINATION.md               # 全ページ自動巡回機能ガイド
+├── MULTIPLE_DOWNLOADS.md       # 複数ダウンロードリンク対応ガイド
+├── UI_GUIDE.md                 # Unity UI詳細ガイド
+├── AUTO_DOWNLOAD.md            # 自動ダウンロード特定機能ガイド
+├── REQUIREMENTS_CHECK.md       # 要件定義チェックリスト
+├── REQUIREMENTS_COMPARISON.md  # 要件定義との比較表
+└── LICENSE                     # ライセンス情報
 ```
+
+### 📝 ディレクトリの説明
+
+| ディレクトリ | 説明 | Git管理 |
+|------------|------|---------|
+| `Bridge/` | Node.jsローカルサーバー | ✅ 管理対象 |
+| `BoothExtension/` | Chrome/Edge拡張機能 | ✅ 管理対象 |
+| `UnityExtension/` | Unity Editor拡張 | ✅ 管理対象 |
+| `BoothBridge/` | 実行時データ保存先 | ❌ .gitignore |
+| `Assets/ImportedAssets/` | アセット展開先 | ❌ .gitignore |
+| `node_modules/` | Node.js依存関係 | ❌ .gitignore |
 
 ---
 

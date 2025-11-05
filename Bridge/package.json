@@ -1,0 +1,24 @@
+{
+  "name": "booth-import-assistant-bridge",
+  "version": "0.1.0",
+  "description": "Local bridge server for BOOTH Import Assistant (Development)",
+  "main": "bridge.js",
+  "scripts": {
+    "start": "node bridge.js",
+    "test": "echo \"No tests yet\" && exit 0"
+  },
+  "keywords": [
+    "booth",
+    "unity",
+    "vrc"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.10"
+  }
+}
+

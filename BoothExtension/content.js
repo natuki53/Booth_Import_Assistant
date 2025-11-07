@@ -8,7 +8,30 @@
 const BRIDGE_URL = 'http://localhost:4823/sync';
 const WAIT_TIME = 3000; // DOM読み込み待機時間（ms）
 
-console.log('[BOOTH Import] Content Script 読み込み完了');
+// ログヘルパー関数
+function logInfo(...args) {
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}][BOOTH-CS][INFO]`, ...args);
+}
+
+function logDebug(...args) {
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}][BOOTH-CS][DEBUG]`, ...args);
+}
+
+function logWarn(...args) {
+  const timestamp = new Date().toISOString();
+  console.warn(`[${timestamp}][BOOTH-CS][WARN]`, ...args);
+}
+
+function logError(...args) {
+  const timestamp = new Date().toISOString();
+  console.error(`[${timestamp}][BOOTH-CS][ERROR]`, ...args);
+}
+
+logInfo('=== Content Script 読み込み完了 ===');
+logInfo('ページURL:', location.href);
+logInfo('Bridge URL:', BRIDGE_URL);
 
 /**
  * 指定されたDocumentオブジェクトから商品情報を解析（既存ロジック維持）
@@ -196,52 +219,65 @@ async function fetchPageDOM(pageNum) {
  * 全ページを巡回して商品情報を取得（メイン関数）
  */
 async function extractBoothItems() {
+  logInfo('=== 全ページ巡回開始 ===');
+  
   const allItems = [];
   const processedIds = new Set(); // 全ページ通しての重複除去
   
   try {
     // 現在のページから全ページ数を取得
     const totalPages = getTotalPages(document);
+    logInfo(`検出ページ数: ${totalPages}ページ`);
     
-    console.log('[BOOTH Import] 全ページ巡回開始:', totalPages, 'ページ');
+    if (totalPages === 0) {
+      logWarn('ページ数が0です。ページ構造が変更された可能性があります。');
+      return [];
+    }
     
     // 現在のページ（1ページ目）を解析
-    console.log('[BOOTH Import] 現在のページを解析中...');
+    logInfo('現在のページ（1ページ目）を解析中...');
     if (typeof showProgressNotification === 'function') {
       showProgressNotification(`🔄 ページ 1/${totalPages} を取得中...`);
     }
     
     const currentPageItems = extractBoothItemsFromDOM(document, processedIds);
     allItems.push(...currentPageItems);
+    logInfo(`ページ1完了: ${currentPageItems.length}件取得`);
     
     // 2ページ目以降を取得して解析
     for (let page = 2; page <= totalPages; page++) {
       // レート制限を考慮して少し待機
+      logDebug(`ページ${page}取得前に500ms待機...`);
       await new Promise(resolve => setTimeout(resolve, 500));
       
       if (typeof showProgressNotification === 'function') {
         showProgressNotification(`🔄 ページ ${page}/${totalPages} を取得中...`);
       }
       
+      logDebug(`ページ${page}/${totalPages}を取得中...`);
       const pageDoc = await fetchPageDOM(page);
       
       if (pageDoc) {
         const pageItems = extractBoothItemsFromDOM(pageDoc, processedIds);
         allItems.push(...pageItems);
-        console.log('[BOOTH Import] ページ', page, '/', totalPages, '完了 -', pageItems.length, '件取得（累計', allItems.length, '件）');
+        logInfo(`ページ${page}/${totalPages}完了: ${pageItems.length}件取得（累計${allItems.length}件）`);
       } else {
-        console.warn('[BOOTH Import] ページ', page, 'の取得に失敗');
+        logWarn(`⚠️ ページ${page}の取得に失敗しました`);
       }
     }
     
-    console.log('[BOOTH Import] 全ページ解析完了:', allItems.length, '件（重複除去後）');
+    logInfo('=== 全ページ解析完了 ===');
+    logInfo(`総取得件数: ${allItems.length}件（重複除去後）`);
+    logInfo(`処理済みID数: ${processedIds.size}個`);
     
     if (typeof showProgressNotification === 'function') {
       showProgressNotification(`✅ 全${totalPages}ページ取得完了 - ${allItems.length}件`);
     }
     
   } catch (e) {
-    console.error('[BOOTH Import] 全ページ取得エラー:', e);
+    logError('=== 全ページ取得エラー ===');
+    logError('エラーメッセージ:', e.message);
+    logError('スタック:', e.stack);
   }
   
   return allItems;
@@ -276,29 +312,66 @@ function saveBoothLibraryJSON(items) {
  * Bridgeへ送信
  */
 async function syncToBridge(items) {
+  logInfo('=== Bridge送信開始 ===');
+  logInfo(`送信データ件数: ${items.length}件`);
+  
   try {
-    console.log('[BOOTH Import] Bridge送信開始:', items.length, '件');
+    // データサイズをログ
+    const jsonString = JSON.stringify(items);
+    const dataSizeKB = (jsonString.length / 1024).toFixed(2);
+    logDebug(`データサイズ: ${dataSizeKB} KB`);
+    
+    logDebug('Bridge URL:', BRIDGE_URL);
+    logDebug('送信開始...');
     
     const response = await fetch(BRIDGE_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(items)
+      body: jsonString
     });
+    
+    logDebug(`HTTPレスポンス: ${response.status} ${response.statusText}`);
     
     if (response.ok) {
       const result = await response.json();
-      console.log('[BOOTH Import] 同期完了:', result);
+      logInfo('✓ 同期完了');
+      logInfo('レスポンス:', result);
+      
+      if (result.updated !== undefined) {
+        logInfo(`  更新: ${result.updated}件`);
+        logInfo(`  追加: ${result.added}件`);
+        logInfo(`  サムネイルDL: ${result.thumbnails}件`);
+      }
       
       // ページ上部に成功メッセージを表示
       showNotification('✅ Unityへの同期が完了しました！', 'success');
     } else {
-      console.error('[BOOTH Import] Bridge応答エラー:', response.status);
+      const errorText = await response.text().catch(() => '');
+      logError('=== Bridge応答エラー ===');
+      logError(`HTTPステータス: ${response.status} ${response.statusText}`);
+      logError('レスポンスボディ:', errorText);
       showNotification('❌ Bridgeへの接続に失敗しました', 'error');
     }
   } catch (e) {
-    console.error('[BOOTH Import] Bridge送信エラー:', e);
+    logError('=== Bridge送信エラー ===');
+    logError('エラータイプ:', e.name);
+    logError('エラーメッセージ:', e.message);
+    logError('スタック:', e.stack);
+    
+    if (e.name === 'TypeError' && e.message.includes('fetch')) {
+      logError('');
+      logError('🔴 Bridgeに接続できません');
+      logError('原因: Bridgeが起動していないか、ポート4823が使用できません');
+      logError('');
+      logError('対処方法:');
+      logError('  1. Unityを開く');
+      logError('  2. Tools > BOOTH Library を開く');
+      logError('  3. 「同期」ボタンを押してBridgeを起動');
+      logError('  4. このページをリロードして再試行');
+    }
+    
     showNotification('❌ Unityが起動していません。Bridgeを起動してから再試行してください。', 'error');
   }
 }
@@ -400,30 +473,43 @@ function hideProgressNotification() {
  * ダウンロードURLマップをbackground.jsに送信
  */
 function sendDownloadMapToBackground(items) {
+  logInfo('=== ダウンロードマップ送信 ===');
+  
   try {
     // 商品IDとダウンロードURLの対応マップを作成
     const downloadMap = {};
+    let totalUrls = 0;
     
     for (const item of items) {
       if (item.downloadUrls && item.downloadUrls.length > 0) {
         downloadMap[item.id] = item.downloadUrls.map(dl => dl.url);
+        totalUrls += item.downloadUrls.length;
       }
     }
     
+    const productCount = Object.keys(downloadMap).length;
+    logInfo(`マップ作成完了: ${productCount}商品, ${totalUrls}個のURL`);
+    logDebug('マップ詳細:', downloadMap);
+    
     // background.jsに送信
+    logDebug('Background Scriptに送信中...');
     chrome.runtime.sendMessage({
       type: 'UPDATE_DOWNLOAD_MAP',
       data: downloadMap
     }, (response) => {
       if (chrome.runtime.lastError) {
-        console.warn('[BOOTH Import] Background通信エラー:', chrome.runtime.lastError);
+        logWarn('⚠️ Background通信エラー:', chrome.runtime.lastError);
+        logWarn('Background Scriptが起動していない可能性があります');
       } else {
-        console.log('[BOOTH Import] ダウンロードマップ送信完了:', Object.keys(downloadMap).length, '商品');
+        logInfo('✓ ダウンロードマップ送信完了');
+        logDebug('レスポンス:', response);
       }
     });
     
   } catch (e) {
-    console.error('[BOOTH Import] ダウンロードマップ送信エラー:', e);
+    logError('=== ダウンロードマップ送信エラー ===');
+    logError('エラーメッセージ:', e.message);
+    logError('スタック:', e.stack);
   }
 }
 
@@ -431,45 +517,69 @@ function sendDownloadMapToBackground(items) {
  * 自動同期処理（非同期対応）
  */
 async function autoSync() {
+  logInfo('=== 自動同期処理開始 ===');
+  
   // URLチェック（manage.booth.pm または accounts.booth.pm）
   const validHosts = ['manage.booth.pm', 'accounts.booth.pm'];
+  
+  logDebug('現在のホスト:', location.hostname);
+  logDebug('現在のパス:', location.pathname);
+  
   if (!validHosts.includes(location.hostname)) {
-    console.log('[BOOTH Import]', location.hostname, 'では動作しません');
+    logWarn('このホストでは動作しません:', location.hostname);
+    logWarn('有効なホスト:', validHosts.join(', '));
     return;
   }
   
   if (!location.pathname.startsWith('/library')) {
-    console.log('[BOOTH Import] 購入ライブラリページでのみ動作します');
+    logWarn('購入ライブラリページではありません:', location.pathname);
+    logWarn('購入ライブラリページでのみ動作します');
     return;
   }
   
-  console.log('[BOOTH Import] 自動同期開始');
+  logInfo('✓ ページ確認OK - 自動同期を開始します');
   
   // DOM読み込み待機
+  logDebug(`DOM読み込み待機中（${WAIT_TIME}ms）...`);
   await new Promise(resolve => setTimeout(resolve, WAIT_TIME));
+  logDebug('✓ DOM読み込み待機完了');
   
   try {
     // 全ページ取得開始
+    logInfo('商品情報取得開始...');
     showProgressNotification('🔄 BOOTH商品を取得中...');
     
+    const startTime = Date.now();
     const items = await extractBoothItems();
+    const elapsedTime = ((Date.now() - startTime) / 1000).toFixed(1);
     
     hideProgressNotification();
     
+    logInfo(`✓ 商品情報取得完了: ${items.length}件 (${elapsedTime}秒)`);
+    
     if (items.length === 0) {
-      console.warn('[BOOTH Import] 商品が見つかりませんでした');
+      logWarn('⚠️ 商品が見つかりませんでした');
+      logWarn('原因考察:');
+      logWarn('  - BOOTHで購入した商品がない');
+      logWarn('  - ページ構造が変更された可能性');
+      logWarn('  - DOM読み込みが完了していない');
       showNotification('⚠️ 商品が見つかりませんでした。ページを更新してください。', 'error');
       return;
     }
     
+    // Bridge同期
     await syncToBridge(items);
     
     // ダウンロードURLマップをbackground.jsに送信
     sendDownloadMapToBackground(items);
     
+    logInfo('=== 自動同期処理完了 ===');
+    
   } catch (e) {
     hideProgressNotification();
-    console.error('[BOOTH Import] 同期エラー:', e);
+    logError('=== 同期エラー ===');
+    logError('エラーメッセージ:', e.message);
+    logError('スタック:', e.stack);
     showNotification('❌ 同期中にエラーが発生しました', 'error');
   }
 }

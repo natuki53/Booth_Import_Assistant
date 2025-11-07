@@ -462,12 +462,28 @@ namespace BoothImportAssistant
                     // 購入日で降順ソート
                     assets = assets.OrderByDescending(a => a.purchaseDate).ToList();
                     
-                    Debug.Log("[BoothBridge] アセット読み込み完了: " + assets.Count + "件");
+                    Debug.Log("[BoothBridge] ✓ アセット読み込み完了: " + assets.Count + "件");
+                    
+                    // サマリー情報
+                    int installedCount = assets.Count(a => a.installed);
+                    int withDownloadUrls = assets.Count(a => a.downloadUrls != null && a.downloadUrls.Length > 0);
+                    Debug.Log($"[BoothBridge]   インストール済み: {installedCount}件");
+                    Debug.Log($"[BoothBridge]   ダウンロードURL有: {withDownloadUrls}件");
                 }
             }
             catch (Exception ex)
             {
                 Debug.LogError("[BoothBridge] JSON読み込みエラー: " + ex.Message);
+                Debug.LogError("[BoothBridge] スタックトレース: " + ex.StackTrace);
+                Debug.LogError("[BoothBridge] ファイルパス: " + jsonFilePath);
+                
+                // バックアップファイルの確認
+                string backupPath = jsonFilePath.Replace(".json", ".backup.json");
+                if (File.Exists(backupPath))
+                {
+                    Debug.LogWarning("[BoothBridge] バックアップファイルが存在します: " + backupPath);
+                    Debug.LogWarning("[BoothBridge] 必要に応じてバックアップから復元してください");
+                }
             }
         }
 
@@ -576,21 +592,35 @@ namespace BoothImportAssistant
             if (!File.Exists(packagePath))
             {
                 Debug.LogWarning("[BoothBridge] パッケージファイルが見つかりません: " + packagePath);
+                Debug.LogWarning("[BoothBridge] ファイルが削除されたか、移動された可能性があります");
                 return;
             }
 
             try
             {
-                Debug.Log("[BoothBridge] .unitypackageインポート開始: " + packagePath);
+                FileInfo fileInfo = new FileInfo(packagePath);
+                long fileSizeKB = fileInfo.Length / 1024;
+                
+                Debug.Log("[BoothBridge] ✓ .unitypackageインポート開始");
+                Debug.Log($"[BoothBridge]   ファイル: {Path.GetFileName(packagePath)}");
+                Debug.Log($"[BoothBridge]   サイズ: {fileSizeKB} KB");
+                Debug.Log($"[BoothBridge]   パス: {packagePath}");
                 
                 // インタラクティブモードでインポート（ユーザーが選択可能）
                 AssetDatabase.ImportPackage(packagePath, true);
                 
-                Debug.Log("[BoothBridge] .unitypackageインポートダイアログ表示完了");
+                Debug.Log("[BoothBridge] ✓ インポートダイアログ表示完了");
+                Debug.Log("[BoothBridge] ユーザーによる確認を待機中...");
             }
             catch (System.Exception ex)
             {
                 Debug.LogError("[BoothBridge] .unitypackageインポートエラー: " + ex.Message);
+                Debug.LogError("[BoothBridge] スタックトレース: " + ex.StackTrace);
+                Debug.LogError("[BoothBridge] ファイルパス: " + packagePath);
+                
+                EditorUtility.DisplayDialog("インポートエラー", 
+                    "UnityPackageのインポートに失敗しました。\n\n" + ex.Message + "\n\nUnityコンソールで詳細を確認してください。", 
+                    "OK");
             }
         }
 

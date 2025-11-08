@@ -5,8 +5,6 @@ VRChatアバター開発者向けの効率化ツールです。
 
 <div align="center">
 
-[![Add to VCC](https://img.shields.io/badge/VCC%E3%81%AB%E8%BF%BD%E5%8A%A0-00ADD8?style=for-the-badge&logo=unity&logoColor=white)](vcc://vpm/addRepo?url=https://natuki53.github.io/Booth_Import_Assistant/index.json)
-
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Unity](https://img.shields.io/badge/Unity-2022.3%2B-blue.svg)](https://unity.com/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
@@ -16,25 +14,23 @@ VRChatアバター開発者向けの効率化ツールです。
 
 ---
 
-## ✨ 特徴
+## 特徴
 
-- ✅ **Node.js組み込み済み** - 追加インストール不要！
-- ✅ **VCC対応** - ワンクリックでインストール
-- ✅ **自動インポート** - ダウンロード→展開→インポートを全自動化
-- ✅ **プログレスバー** - リアルタイムで進捗を表示
-- ✅ **複数ダウンロード対応** - アバター別・マテリアル別に自動分類
-- ✅ **完全ローカル** - 外部通信なし・セキュア設計
-- ✅ **クロスプラットフォーム** - Windows/Mac/Linux対応
+- **Node.js組み込み済み** - 追加インストール不要！
+- **VCC対応** - ワンクリックでインストール
+- **自動インポート** - ダウンロード→展開→インポートを全自動化
+- **プログレスバー** - リアルタイムで進捗を表示
+- **複数ダウンロード対応** - アバター別・マテリアル別に自動分類
+- **完全ローカル** - 外部通信なし・セキュア設計
+- **クロスプラットフォーム** - Windows/Mac/Linux対応
 
 ---
 
-## 📦 インストール方法
+## インストール方法
 
-### 🚀 ワンクリックインストール（推奨）
+### ワンクリックインストール（推奨）
 
 <div align="center">
-
-**VCCで開く:**
 
 [![Add to VCC](https://img.shields.io/badge/VCC%E3%81%AB%E8%BF%BD%E5%8A%A0-00ADD8?style=for-the-badge&logo=unity&logoColor=white)](vcc://vpm/addRepo?url=https://natuki53.github.io/Booth_Import_Assistant/index.json)
 
@@ -47,30 +43,6 @@ VRChatアバター開発者向けの効率化ツールです。
 4. 完了！Node.jsのインストールは不要です 🎉
 
 ---
-
-### 📝 手動でリポジトリを追加する場合
-
-1. **VCCまたはALCOMを開く**
-2. **Settings（設定）を開く**
-3. **「Packages」→「Add Repository」**
-4. **以下のURLを追加:**
-   ```
-   https://natuki53.github.io/Booth_Import_Assistant/index.json
-   ```
-5. **プロジェクトを選択**
-6. **「Manage Project」→「BOOTH Import Assistant」を追加**
-7. **完了！** Node.jsのインストールは不要です 🎉
-
-### VCC（Git URL経由）を使用する場合
-
-1. VCCを開く
-2. プロジェクトを選択
-3. 「Manage Project」→「Add Package」
-4. このリポジトリのURLを追加:
-   ```
-   https://github.com/natuki53/Booth_Import_Assistant.git?path=/Assets/BoothImportAssistant
-   ```
-5. 完了！ **Node.jsのインストールは不要です** 🎉
 
 ### 手動インストール
 
@@ -88,7 +60,7 @@ VRChatアバター開発者向けの効率化ツールです。
 
 ---
 
-## 🚀 使い方
+## 使い方
 
 ### 初回セットアップ
 
@@ -129,7 +101,7 @@ VRChatアバター開発者向けの効率化ツールです。
 
 ---
 
-## 📁 ディレクトリ構造
+## ディレクトリ構造
 
 ```
 Booth_Import_Assistant/
@@ -166,7 +138,7 @@ Booth_Import_Assistant/
 
 ---
 
-## 🔄 動作フロー
+## 動作フロー
 
 ```
 1. Unity「同期」ボタン
@@ -192,9 +164,9 @@ Booth_Import_Assistant/
 
 ---
 
-## 🔧 必要なもの
+## 必要なもの
 
-- Unity 2022.3 以上
+- Unity 2022.3.
 - Chrome または Edge ブラウザ
 - BOOTHアカウント
 
@@ -202,59 +174,21 @@ Booth_Import_Assistant/
 
 ---
 
-## 🐛 トラブルシューティング
-
-### Bridgeが起動しない
-
-**Windows:**
-1. Unity コンソールでエラーメッセージを確認
-2. `Assets/BoothImportAssistant/Bridge/node-runtime/win-x64/node.exe` が存在するか確認
-
-**Mac/Linux:**
-システムのNode.jsにフォールバックします。Node.jsをインストールしてください:
-```bash
-# Mac (Homebrew)
-brew install node
-
-# Linux
-sudo apt install nodejs
-```
-
-### ブラウザ拡張が動作しない
-
-1. `chrome://extensions/` で拡張機能が有効か確認
-2. デベロッパーモードが有効か確認
-3. ブラウザを再起動
-
-### 同期ボタンを押してもデータが表示されない
-
-1. ブラウザの開発者ツール（F12）を開く
-2. Console タブで `[BOOTH Import]` のログを確認
-3. BOOTHにログインしているか確認
-
-### 自動インポートが動作しない
-
-1. Unity コンソールでエラーを確認
-2. `BoothBridge/temp/` フォルダが存在するか確認
-3. .unitypackageファイルが正しく配置されているか確認
-
----
-
-## 🔒 セキュリティについて
+## セキュリティについて
 
 本ツールは以下のセキュリティ方針で設計されています：
 
-- ✅ **外部通信なし**: すべての処理がローカルで完結
-- ✅ **認証情報不使用**: Cookie・トークン・パスワードを扱わない
-- ✅ **BOOTH公式リンクのみ**: 商品ページは公式URLのみ使用
-- ✅ **localhost限定**: Bridgeはローカルホストのみでリッスン
-- ✅ **ユーザー操作必須**: 自動ログイン・自動ダウンロードなし
+- **外部通信なし**: すべての処理がローカルで完結
+- **認証情報不使用**: Cookie・トークン・パスワードを扱わない
+- **BOOTH公式リンクのみ**: 商品ページは公式URLのみ使用
+- **localhost限定**: Bridgeはローカルホストのみ
+- **ユーザー操作必須**: 自動ログイン・自動ダウンロードなし
 
 **本ツールはBOOTH公式ツールではありません。個人の責任でご利用ください。**
 
 ---
 
-## 📝 技術スタック
+## 技術スタック
 
 - **Unity Editor拡張**: C#
 - **Bridge サーバー**: Node.js v20
@@ -264,26 +198,7 @@ sudo apt install nodejs
 
 ---
 
-## 🛠️ 開発者向け
-
-### ビルド・テスト
-
-```bash
-# Bridge の依存関係インストール
-cd Assets/BoothImportAssistant/Bridge
-npm install
-
-# Unityでテスト
-# Tools > BOOTH Library を開く
-```
-
-### Node.jsバイナリの更新
-
-詳細は `Assets/BoothImportAssistant/Bridge/node-runtime/README.md` を参照。
-
----
-
-## 📝 ライセンス
+## ライセンス
 
 MIT License - 詳細は [LICENSE](LICENSE) を参照
 
@@ -291,25 +206,15 @@ MIT License - 詳細は [LICENSE](LICENSE) を参照
 
 ---
 
-## 🤝 貢献
-
-プルリクエストは歓迎します！バグ報告や機能要望はIssuesで受け付けています。
-
----
-
-## ⚠️ 免責事項
+## 免責事項
 
 本ツールは非公式ツールです。BOOTHの仕様変更により動作しなくなる可能性があります。
 本ツールの使用により生じたいかなる損害についても、作者は一切の責任を負いません。
 
 ---
 
-## 🔗 リンク
+## 関連リンク
 
-- **GitHub**: https://github.com/natuki53/Booth_Import_Assistant
 - **BOOTH**: https://booth.pm/
 - **VCC**: https://vcc.docs.vrchat.com/
-
----
-
-**Enjoy your VRChat creation! 🎨✨**
+- **ALCOM**: https://vrc-get.anatawa12.com/ja/alcom/

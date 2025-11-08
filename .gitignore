@@ -69,3 +69,6 @@ Assets/ImportedAssets/
 # Backup files
 *.backup
 *.bak
+
+# GitHub Pages - Auto-generated
+docs/index.json

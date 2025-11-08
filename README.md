@@ -27,7 +27,20 @@ VRChatアバター開発者向けの効率化ツールです。
 
 ## 📦 インストール方法
 
-### VCC（VRChat Creator Companion）を使用する場合（推奨）
+### VCC/ALCOM（VPMリポジトリ経由）を使用する場合（推奨）
+
+1. **VCCまたはALCOMを開く**
+2. **Settings（設定）を開く**
+3. **「Packages」→「Add Repository」**
+4. **以下のURLを追加:**
+   ```
+   https://natuki53.github.io/Booth_Import_Assistant/index.json
+   ```
+5. **プロジェクトを選択**
+6. **「Manage Project」→「BOOTH Import Assistant」を追加**
+7. **完了！** Node.jsのインストールは不要です 🎉
+
+### VCC（Git URL経由）を使用する場合
 
 1. VCCを開く
 2. プロジェクトを選択

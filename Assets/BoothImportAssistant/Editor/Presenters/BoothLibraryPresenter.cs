@@ -176,12 +176,13 @@ namespace BoothImportAssistant.Presenters
             System.Threading.Thread.Sleep(3000);
 
             EditorUtility.DisplayProgressBar("同期中", "BOOTHページを開いています...", 0.6f);
+            // 購入ページから同期を開始（購入とギフト両方を取得）
             Application.OpenURL("https://accounts.booth.pm/library?sync=true");
 
             EditorUtility.ClearProgressBar();
 
             EditorUtility.DisplayDialog("同期開始",
-                "BOOTHページが開きました。\n\nページ読み込み完了後、自動的に同期が行われます。\n完了まで数秒お待ちください。",
+                "BOOTHページが開きました。\n\nページ読み込み完了後、購入した商品とギフトを自動的に同期します。\n完了まで数秒お待ちください。",
                 "OK");
         }
 
@@ -235,7 +236,6 @@ namespace BoothImportAssistant.Presenters
                 EditorUtility.DisplayDialog("ダウンロード",
                     "ダウンロードページが開きました。\n\n" +
                     "対象: " + label + "\n\n" +
-                    "BOOTHのダウンロードボタンをクリックしてください。\n" +
                     "ダウンロード完了後、自動的にUnityに展開されます。",
                     "OK");
             }
@@ -246,8 +246,8 @@ namespace BoothImportAssistant.Presenters
 
                 EditorUtility.DisplayDialog("ダウンロード",
                     "商品ページが開きました。\n\n" +
-                    "BOOTHから「booth_" + asset.id.Replace("booth_", "") + ".zip」という名前でダウンロードしてください。\n" +
-                    "ダウンロードフォルダに保存すると、自動的にUnityに展開されます。",
+                    "BOOTHからダウンロードしてください。\n" +
+                    "ダウンロード完了後、自動的にUnityに展開されます。",
                     "OK");
             }
         }

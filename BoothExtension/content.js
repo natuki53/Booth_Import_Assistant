@@ -25,8 +25,11 @@ function logError(...args) {
 
 /**
  * 指定されたDocumentオブジェクトから商品情報を解析（BOOTHの実際のHTML構造に完全対応）
+ * @param {Document} doc - 解析対象のドキュメント
+ * @param {Set} processedIds - 処理済みID
+ * @param {string} source - ソース ('purchased' or 'gift')
  */
-function extractBoothItemsFromDOM(doc, processedIds = new Set()) {
+function extractBoothItemsFromDOM(doc, processedIds = new Set(), source = 'purchased') {
   const items = [];
   
   try {
@@ -186,7 +189,8 @@ function extractBoothItemsFromDOM(doc, processedIds = new Set()) {
           localThumbnail: `BoothBridge/thumbnails/${boothId}.jpg`,
           installed: false,
           importPath: `Assets/ImportedAssets/${boothId}/`,
-          notes: ''
+          notes: '',
+          source: source  // 購入またはギフトを識別
         };
         
         items.push(item);
@@ -238,10 +242,12 @@ function getTotalPages(doc) {
 
 /**
  * 指定ページのHTMLを取得してDOMに変換
+ * @param {number} pageNum - ページ番号
+ * @param {string} path - パス ('/library' or '/library/gifts')
  */
-async function fetchPageDOM(pageNum) {
+async function fetchPageDOM(pageNum, path = '/library') {
   try {
-    const url = `${location.origin}${location.pathname}?page=${pageNum}`;
+    const url = `${location.origin}${path}?page=${pageNum}`;
     const response = await fetch(url, {
       credentials: 'same-origin',
       headers: { 'Accept': 'text/html' }
@@ -253,45 +259,113 @@ async function fetchPageDOM(pageNum) {
     const parser = new DOMParser();
     return parser.parseFromString(html, 'text/html');
   } catch (e) {
-    logError('ページ取得エラー:', pageNum, e.message);
+    logError('ページ取得エラー:', path, pageNum, e.message);
     return null;
   }
 }
 
 /**
  * 全ページを巡回して商品情報を取得（メイン関数）
+ * 購入した商品とギフトの両方を取得
  */
 async function extractBoothItems() {
   const allItems = [];
   const processedIds = new Set();
   
   try {
-    const totalPages = getTotalPages(document);
-    if (totalPages === 0) return [];
+    // ========== 購入した商品を取得 ==========
+    const purchasedPath = '/library';
+    const currentPath = location.pathname;
+    const isPurchasedPage = !currentPath.includes('/gifts');
     
-    if (typeof showProgressNotification === 'function') {
-      showProgressNotification(`🔄 ページ 1/${totalPages} を取得中...`);
-    }
-    
-    const currentPageItems = extractBoothItemsFromDOM(document, processedIds);
-    allItems.push(...currentPageItems);
-    
-    for (let page = 2; page <= totalPages; page++) {
-      await new Promise(resolve => setTimeout(resolve, 500));
+    // 現在のページが購入ページの場合
+    if (isPurchasedPage) {
+      const purchasedTotalPages = getTotalPages(document);
       
       if (typeof showProgressNotification === 'function') {
-        showProgressNotification(`🔄 ページ ${page}/${totalPages} を取得中...`);
+        showProgressNotification(`🔄 購入商品 ページ 1/${purchasedTotalPages} を取得中...`);
       }
       
-      const pageDoc = await fetchPageDOM(page);
-      if (pageDoc) {
-        const pageItems = extractBoothItemsFromDOM(pageDoc, processedIds);
-        allItems.push(...pageItems);
+      const currentPageItems = extractBoothItemsFromDOM(document, processedIds, 'purchased');
+      allItems.push(...currentPageItems);
+      
+      for (let page = 2; page <= purchasedTotalPages; page++) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        if (typeof showProgressNotification === 'function') {
+          showProgressNotification(`🔄 購入商品 ページ ${page}/${purchasedTotalPages} を取得中...`);
+        }
+        
+        const pageDoc = await fetchPageDOM(page, purchasedPath);
+        if (pageDoc) {
+          const pageItems = extractBoothItemsFromDOM(pageDoc, processedIds, 'purchased');
+          allItems.push(...pageItems);
+        }
+      }
+    } else {
+      // ギフトページの場合は購入ページを別途取得
+      const firstPageDoc = await fetchPageDOM(1, purchasedPath);
+      if (firstPageDoc) {
+        const purchasedTotalPages = getTotalPages(firstPageDoc);
+        
+        for (let page = 1; page <= purchasedTotalPages; page++) {
+          if (typeof showProgressNotification === 'function') {
+            showProgressNotification(`🔄 購入商品 ページ ${page}/${purchasedTotalPages} を取得中...`);
+          }
+          
+          const pageDoc = page === 1 ? firstPageDoc : await fetchPageDOM(page, purchasedPath);
+          if (pageDoc) {
+            const pageItems = extractBoothItemsFromDOM(pageDoc, processedIds, 'purchased');
+            allItems.push(...pageItems);
+          }
+          
+          if (page < purchasedTotalPages) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        }
+      }
+    }
+    
+    // ========== ギフトを取得 ==========
+    const giftsPath = '/library/gifts';
+    
+    // ギフトの最初のページを取得
+    const isGiftPage = currentPath.includes('/gifts');
+    let giftsFirstPageDoc = isGiftPage ? document : await fetchPageDOM(1, giftsPath);
+    
+    if (giftsFirstPageDoc) {
+      const giftsTotalPages = getTotalPages(giftsFirstPageDoc);
+      
+      if (giftsTotalPages > 0) {
+        // 最初のページを処理
+        if (typeof showProgressNotification === 'function') {
+          showProgressNotification(`🎁 ギフト ページ 1/${giftsTotalPages} を取得中...`);
+        }
+        
+        const firstPageItems = extractBoothItemsFromDOM(giftsFirstPageDoc, processedIds, 'gift');
+        allItems.push(...firstPageItems);
+        
+        // 2ページ目以降を処理
+        for (let page = 2; page <= giftsTotalPages; page++) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          if (typeof showProgressNotification === 'function') {
+            showProgressNotification(`🎁 ギフト ページ ${page}/${giftsTotalPages} を取得中...`);
+          }
+          
+          const pageDoc = await fetchPageDOM(page, giftsPath);
+          if (pageDoc) {
+            const pageItems = extractBoothItemsFromDOM(pageDoc, processedIds, 'gift');
+            allItems.push(...pageItems);
+          }
+        }
       }
     }
     
     if (typeof showProgressNotification === 'function') {
-      showProgressNotification(`✅ 全${totalPages}ページ取得完了 - ${allItems.length}件`);
+      const purchasedCount = allItems.filter(item => item.source === 'purchased').length;
+      const giftCount = allItems.filter(item => item.source === 'gift').length;
+      showProgressNotification(`✅ 取得完了 - 購入:${purchasedCount}件 ギフト:${giftCount}件`);
     }
   } catch (e) {
     logError('全ページ取得エラー:', e.message);
@@ -302,7 +376,9 @@ async function extractBoothItems() {
 
 function extractBoothItemsCurrentPageOnly() {
   const processedIds = new Set();
-  return extractBoothItemsFromDOM(document, processedIds);
+  const currentPath = location.pathname;
+  const source = currentPath.includes('/gifts') ? 'gift' : 'purchased';
+  return extractBoothItemsFromDOM(document, processedIds, source);
 }
 
 function saveBoothLibraryJSON(items) {

@@ -75,8 +75,6 @@ namespace BoothImportAssistant
             
             // エディタ更新ハンドラーを追加（Bridgeステータスのリアルタイム更新用）
             EditorApplication.update += OnEditorUpdate;
-
-            Debug.Log("[BoothBridge] BOOTH Library ウィンドウを開きました");
         }
 
         private void OnDisable()
@@ -495,27 +493,18 @@ namespace BoothImportAssistant
 
         private void SyncWithBooth()
         {
-            // 既存のBridgeプロセスを停止（ポートの競合を防ぐ）
             if (BridgeManager.IsBridgeRunning())
             {
-                Debug.Log("[BoothBridge] 既存のBridgeプロセスを停止します");
                 BridgeManager.StopBridge();
-                System.Threading.Thread.Sleep(500); // プロセス終了を待つ
+                System.Threading.Thread.Sleep(500);
             }
             
-            // Bridge起動
             bool started = BridgeManager.StartBridge();
-            
-            if (!started)
-            {
-                return;
-            }
+            if (!started) return;
 
-            // 3秒待機（Bridge起動完了待ち）
             EditorUtility.DisplayProgressBar("同期中", "Bridgeを起動しています...", 0.3f);
             System.Threading.Thread.Sleep(3000);
 
-            // BOOTHページを開く（sync=trueパラメータを付加して、自動同期を有効化）
             EditorUtility.DisplayProgressBar("同期中", "BOOTHページを開いています...", 0.6f);
             Application.OpenURL("https://accounts.booth.pm/library?sync=true");
 
@@ -575,11 +564,10 @@ namespace BoothImportAssistant
         private void LoadAssets()
         {
             assets.Clear();
-            thumbnailCache.Clear(); // サムネイルキャッシュもクリア
+            thumbnailCache.Clear();
 
             if (!File.Exists(jsonFilePath))
             {
-                Debug.Log("[BoothBridge] booth_assets.json が見つかりません: " + jsonFilePath);
                 return;
             }
 
@@ -591,31 +579,20 @@ namespace BoothImportAssistant
                 if (wrapper != null && wrapper.items != null)
                 {
                     assets = wrapper.items.ToList();
-                    
-                    // 購入日で降順ソート
                     assets = assets.OrderByDescending(a => a.purchaseDate).ToList();
                     
-                    Debug.Log("[BoothBridge] ✓ アセット読み込み完了: " + assets.Count + "件");
-                    
-                    // サマリー情報
                     int installedCount = assets.Count(a => a.installed);
-                    int withDownloadUrls = assets.Count(a => a.downloadUrls != null && a.downloadUrls.Length > 0);
-                    Debug.Log($"[BoothBridge]   インストール済み: {installedCount}件");
-                    Debug.Log($"[BoothBridge]   ダウンロードURL有: {withDownloadUrls}件");
+                    Debug.Log($"[BoothBridge] アセット読み込み: {assets.Count}件 (インストール済み: {installedCount})");
                 }
             }
             catch (Exception ex)
             {
-                Debug.LogError("[BoothBridge] JSON読み込みエラー: " + ex.Message);
-                Debug.LogError("[BoothBridge] スタックトレース: " + ex.StackTrace);
-                Debug.LogError("[BoothBridge] ファイルパス: " + jsonFilePath);
+                Debug.LogError($"[BoothBridge] JSON読み込みエラー: {ex.Message}");
                 
-                // バックアップファイルの確認
                 string backupPath = jsonFilePath.Replace(".json", ".backup.json");
                 if (File.Exists(backupPath))
                 {
-                    Debug.LogWarning("[BoothBridge] バックアップファイルが存在します: " + backupPath);
-                    Debug.LogWarning("[BoothBridge] 必要に応じてバックアップから復元してください");
+                    Debug.LogWarning("[BoothBridge] バックアップファイルが存在します");
                 }
             }
         }
@@ -670,27 +647,17 @@ namespace BoothImportAssistant
 
         private void SetupFileWatcher()
         {
-            if (!File.Exists(jsonFilePath))
-            {
-                return;
-            }
+            if (!File.Exists(jsonFilePath)) return;
 
             string directory = Path.GetDirectoryName(jsonFilePath);
             string filename = Path.GetFileName(jsonFilePath);
 
-            if (!Directory.Exists(directory))
-            {
-                return;
-            }
+            if (!Directory.Exists(directory)) return;
 
             fileWatcher = new FileSystemWatcher(directory, filename);
             fileWatcher.NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size;
-            
             fileWatcher.Changed += OnFileChanged;
-            
             fileWatcher.EnableRaisingEvents = true;
-
-            Debug.Log("[BoothBridge] FileSystemWatcher設定完了");
         }
 
         private void OnFileChanged(object sender, FileSystemEventArgs e)
@@ -703,10 +670,7 @@ namespace BoothImportAssistant
         private void SetupPackageWatcher()
         {
             string projectPath = GetProjectPath();
-            if (string.IsNullOrEmpty(projectPath))
-            {
-                return;
-            }
+            if (string.IsNullOrEmpty(projectPath)) return;
 
             string tempPackagePath = Path.Combine(projectPath, "BoothBridge", "temp");
             
@@ -718,25 +682,16 @@ namespace BoothImportAssistant
             packageWatcher = new FileSystemWatcher(tempPackagePath, "*.unitypackage");
             packageWatcher.NotifyFilter = NotifyFilters.FileName | NotifyFilters.CreationTime;
             packageWatcher.IncludeSubdirectories = true;
-            
             packageWatcher.Created += OnPackageFileCreated;
-            
             packageWatcher.EnableRaisingEvents = true;
-
-            Debug.Log("[BoothBridge] PackageWatcher設定完了: " + tempPackagePath);
         }
 
         private void OnPackageFileCreated(object sender, FileSystemEventArgs e)
         {
-            // ファイルが完全に書き込まれるまで少し待つ
             System.Threading.Thread.Sleep(500);
             
-            Debug.Log("[BoothBridge] .unitypackage検出: " + e.FullPath);
-            
-            // 検出時刻を記録
             lastPackageDetectionTime = EditorApplication.timeSinceStartup;
             
-            // 検出されたパッケージをリストに追加（重複チェック）
             if (!detectedPackages.Contains(e.FullPath))
             {
                 detectedPackages.Add(e.FullPath);
@@ -747,47 +702,35 @@ namespace BoothImportAssistant
         {
             if (!File.Exists(packagePath))
             {
-                Debug.LogWarning("[BoothBridge] パッケージファイルが見つかりません: " + packagePath);
-                Debug.LogWarning("[BoothBridge] ファイルが削除されたか、移動された可能性があります");
+                Debug.LogWarning("[BoothBridge] パッケージファイルが見つかりません");
                 return;
             }
 
             try
             {
                 FileInfo fileInfo = new FileInfo(packagePath);
-                long fileSizeKB = fileInfo.Length / 1024;
+                long fileSizeMB = fileInfo.Length / 1024 / 1024;
                 
-                Debug.Log("[BoothBridge] ✓ .unitypackage自動インポート開始");
-                Debug.Log($"[BoothBridge]   ファイル: {Path.GetFileName(packagePath)}");
-                Debug.Log($"[BoothBridge]   サイズ: {fileSizeKB} KB");
-                Debug.Log($"[BoothBridge]   パス: {packagePath}");
+                Debug.Log($"[BoothBridge] インポート開始: {Path.GetFileName(packagePath)} ({fileSizeMB} MB)");
                 
-                // 自動インポート（インタラクティブモードOFF）
                 AssetDatabase.ImportPackage(packagePath, false);
                 
-                Debug.Log("[BoothBridge] ✓ インポート完了");
-                Debug.Log("[BoothBridge] Assetsフォルダに展開されました");
-                
-                // インポート完了後、.unitypackageファイルを削除（遅延実行）
                 string pathToDelete = packagePath;
                 EditorApplication.delayCall += (EditorApplication.CallbackFunction)(() => DeletePackageFileDelayed(pathToDelete));
             }
             catch (System.Exception ex)
             {
-                Debug.LogError("[BoothBridge] .unitypackageインポートエラー: " + ex.Message);
-                Debug.LogError("[BoothBridge] スタックトレース: " + ex.StackTrace);
-                Debug.LogError("[BoothBridge] ファイルパス: " + packagePath);
+                Debug.LogError($"[BoothBridge] インポートエラー: {ex.Message}");
                 
                 EditorUtility.DisplayDialog("インポートエラー", 
-                    "UnityPackageのインポートに失敗しました。\n\n" + ex.Message + "\n\nUnityコンソールで詳細を確認してください。", 
+                    "UnityPackageのインポートに失敗しました。\n\n" + ex.Message, 
                     "OK");
             }
         }
         
         private void DeletePackageFileDelayed(string packagePath)
         {
-            // 非同期で削除（インポート完了を待つ）
-            double deleteTime = EditorApplication.timeSinceStartup + 3.0; // 3秒後
+            double deleteTime = EditorApplication.timeSinceStartup + 3.0;
             
             EditorApplication.CallbackFunction deleteCallback = null;
             deleteCallback = () =>
@@ -801,12 +744,11 @@ namespace BoothImportAssistant
                         if (File.Exists(packagePath))
                         {
                             File.Delete(packagePath);
-                            Debug.Log($"[BoothBridge] ✓ .unitypackageファイルを削除: {Path.GetFileName(packagePath)}");
                         }
                     }
                     catch (System.Exception ex)
                     {
-                        Debug.LogWarning($"[BoothBridge] .unitypackageファイルの削除に失敗（無視しても問題ありません）: {ex.Message}");
+                        Debug.LogWarning($"[BoothBridge] パッケージ削除失敗: {ex.Message}");
                     }
                 }
             };

@@ -6,18 +6,18 @@
   "packages": {
     "com.natuki.booth-import-assistant": {
       "versions": {
-        "1.0.0": {
+        "0.1.0": {
           "name": "com.natuki.booth-import-assistant",
-          "displayName": "BOOTH Import Assistant",
-          "version": "1.0.0",
+          "displayName": "BOOTH Import Assistant (Beta)",
+          "version": "0.1.0",
           "unity": "2022.3",
-          "description": "BOOTHライブラリから直接Unityプロジェクトにアセットをインポートするツール。VRChatアバター開発者向けの効率化ツールです。",
+          "description": "【Beta版】BOOTHライブラリから直接Unityプロジェクトにアセットをインポートするツール。VRChatアバター開発者向けの効率化ツールです。",
           "author": {
             "name": "natuki",
             "email": "hiiraginatuki53@gmail.com",
             "url": "https://github.com/natuki53"
           },
-          "url": "https://github.com/natuki53/Booth_Import_Assistant/releases/download/v1.0.0/com.natuki.booth-import-assistant-1.0.0.zip",
+          "url": "https://github.com/natuki53/Booth_Import_Assistant/releases/download/v0.1.0/com.natuki.booth-import-assistant-0.1.0.zip",
           "repo": "https://github.com/natuki53/Booth_Import_Assistant",
           "zipSHA256": "",
           "keywords": [

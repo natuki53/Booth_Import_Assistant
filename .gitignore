@@ -72,3 +72,6 @@ Assets/ImportedAssets/
 
 # GitHub Pages - Auto-generated
 docs/index.json
+
+# Release packages (only in GitHub Releases)
+*.zip

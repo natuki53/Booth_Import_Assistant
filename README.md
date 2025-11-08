@@ -1,221 +1,134 @@
-# BOOTH Import Assistant v0.1（開発版・未テスト）
+# BOOTH Import Assistant
 
-VRChat改変ユーザーのための **BOOTH購入資産管理 & Unityインポート補助ツール**
+**BOOTHライブラリから直接Unityプロジェクトにアセットをインポートするツール**  
+VRChatアバター開発者向けの効率化ツールです。
 
-> ⚠️ **注意**: このバージョンは実装完了後、まだ動作確認を行っていません。
+<div align="center">
 
-## 📋 システム概要
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Unity](https://img.shields.io/badge/Unity-2022.3%2B-blue.svg)](https://unity.com/)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 
-BOOTHで購入したアバター・衣装・ツールなどを、Unityプロジェクトで簡単に管理・インポートできるようにするツールです。
-
-### 特徴
-
-- ✅ **完全ローカル**: 外部通信なし・監視なし・ユーザー操作のみで動作
-- ✅ **安全設計**: Cookie・認証情報を扱わない
-- ✅ **高UX**: サムネイル付き一覧表示・リアルタイム更新対応
-- ✅ **自動インポート**: ダウンロードしたZIPから `.unitypackage` を自動抽出してUnityにインポート
+</div>
 
 ---
 
-## 🔧 必要な環境
+## ✨ 特徴
 
-- **OS**: Windows 10以降 / macOS 11 (Big Sur) 以降
-- **Unity**: 2021 LTS 〜 2022 LTS
-- **Node.js**: v18 以上
-- **ブラウザ**: Chrome または Microsoft Edge
+- ✅ **Node.js組み込み済み** - 追加インストール不要！
+- ✅ **VCC対応** - ワンクリックでインストール
+- ✅ **自動インポート** - ダウンロード→展開→インポートを全自動化
+- ✅ **プログレスバー** - リアルタイムで進捗を表示
+- ✅ **複数ダウンロード対応** - アバター別・マテリアル別に自動分類
+- ✅ **完全ローカル** - 外部通信なし・セキュア設計
+- ✅ **クロスプラットフォーム** - Windows/Mac/Linux対応
 
 ---
 
-## 📦 インストール手順
+## 📦 インストール方法
 
-> **Macユーザーの方へ**: より詳細な手順は [MAC_SETUP.md](MAC_SETUP.md) をご覧ください。
+### VCC（VRChat Creator Companion）を使用する場合（推奨）
 
-### 1. Node.jsのインストール
+1. VCCを開く
+2. プロジェクトを選択
+3. 「Manage Project」→「Add Package」
+4. このリポジトリのURLを追加:
+   ```
+   https://github.com/natuki53/Booth_Import_Assistant.git?path=/Assets/BoothImportAssistant
+   ```
+5. 完了！ **Node.jsのインストールは不要です** 🎉
 
-https://nodejs.org/ から Node.js（v18以上）をダウンロードしてインストールしてください。
+### 手動インストール
 
-インストール後、コマンドプロンプトで以下を実行して確認：
+1. [Releases](https://github.com/natuki53/Booth_Import_Assistant/releases) から最新版をダウンロード
+2. `Assets/BoothImportAssistant/` フォルダを自分のUnityプロジェクトの `Assets/` フォルダにコピー
+3. 完了！ **Node.jsのインストールは不要です** 🎉
 
-```bash
-node --version
-```
-
-`v18.0.0` 以上が表示されればOKです。
-
-### 2. Bridgeの依存関係インストール
-
-**Windows（コマンドプロンプトまたはPowerShell）:**
-```bash
-cd Bridge
-npm install
-```
-
-**Mac（ターミナル）:**
-```bash
-cd Bridge
-npm install
-```
-
-### 3. Unity拡張のインポート
-
-1. Unityプロジェクトを開く
-2. `UnityExtension` フォルダ全体をプロジェクトにコピー
-   - Assets フォルダ内に配置推奨：`Assets/BoothImportAssistant/`
-3. Unity Editorが自動的にスクリプトをコンパイル
-
-### 4. ブラウザ拡張のインストール
+### ブラウザ拡張機能のインストール（必須）
 
 1. Chrome または Edge を開く
 2. `chrome://extensions/` にアクセス
 3. 右上の「デベロッパーモード」を有効化
 4. 「パッケージ化されていない拡張機能を読み込む」をクリック
-5. `BoothExtension` フォルダを選択
+5. リポジトリの `BoothExtension/` フォルダを選択
 
 ---
 
 ## 🚀 使い方
 
-### 初回同期（購入リストの取得）
+### 初回セットアップ
 
-1. **Unity でプロジェクトを開く**
-   - プロジェクトを必ず保存してください（無名プロジェクトは非対応）
+1. **Unity Editorで「BOOTH Library」を開く**
+   - メニューから `Tools > BOOTH Library` を選択
 
-2. **BOOTH Library ウィンドウを開く**
-   - Unity メニューから `Tools > BOOTH Library` を選択
+2. **「同期」ボタンをクリック**
+   - BOOTHライブラリページが開きます
+   - 全ページを自動的に巡回してデータを取得
 
-3. **同期ボタンを押す**
-   - ウィンドウ上部の「同期」ボタンをクリック
-   - 自動的にBridgeが起動し、BOOTHページ（https://accounts.booth.pm/library）が開きます
-
-4. **自動同期完了**
-   - BOOTHページ読み込み完了後、**全ページを自動的に巡回**してデータを取得します
-   - 複数ページある場合、画面右上に進捗が表示されます（例：🔄 ページ 3/10 を取得中...）
-   - 数秒〜数十秒後、Unity の BOOTH Library に購入リストが表示されます
-   
-   **全ページ自動巡回の特徴:**
-   - ページネーションを自動検出
-   - 全ページを順次取得して統合
-   - 重複を自動除去
-   - レート制限考慮（ページあたり0.5秒待機）
+3. **完了！**
+   - Unity側に購入したアセット一覧が表示されます
+   - サムネイル付きで見やすく表示
 
 ### アセットのダウンロードとインポート
 
-#### 単一ダウンロードの場合
-
-1. **ダウンロードボタンを押す**
-   - BOOTH Library でダウンロードしたいアセットの「ダウンロード」ボタンをクリック
+1. **Unity側で「DL」ボタンをクリック**
    - BOOTHのダウンロードページが開きます
 
-2. **BOOTHから正式にダウンロード**
-   - 開かれたページで、公式のダウンロードボタンをクリック
-   - ZIPファイルが「ダウンロード」フォルダに保存されます
-     - Windows: `C:\Users\<ユーザー名>\Downloads`
-     - Mac: `/Users/<ユーザー名>/Downloads`
-   - **ファイル名の変更は不要です**（元のファイル名のままでOK）
+2. **BOOTHでダウンロードボタンをクリック**
+   - ZIPファイルがダウンロードフォルダに保存されます
+   - ファイル名の変更は不要です
 
-3. **自動展開・インポート**
-   - Bridgeが自動的にZIPを検知・特定
-   - ZIPから `.unitypackage` ファイルのみを抽出
-   - `Assets/ImportedAssets/booth_<ID>/` に配置
-   - **Unityが自動的にインポートダイアログを表示**
-   - ユーザーがインポート内容を確認して実行
+3. **自動的にインポート開始！**
+   - プログレスバーで進捗を確認
+   - ZIP展開 → .unitypackage検出 → Unityにインポート
+   - インポート後、.unitypackageファイルは自動削除
 
-#### 複数ダウンロード対応（VRChatアバター改変向け）
+#### 複数ダウンロード対応
 
-1つの商品に複数のダウンロードリンクがある場合、**バリエーション数に応じて最適なUIで表示**されます：
+**アバター別ダウンロード:**
+- ドロップダウンメニューで選択
+- 例：「萌ちゃん用」「桔梗ちゃん用」
 
-**2〜3個のバリエーション:**
-- 各バリエーション用のボタンが表示されます
-- 例：「萌ちゃん用」「桔梗ちゃん用」「マテリアル共通」
-
-**4個以上のバリエーション:**
-- **ドロップダウンメニュー**で選択
-- 「選択中をDL」ボタンで個別ダウンロード
-- 「全てDL」ボタンで一括ダウンロード（全ページを0.5秒間隔で開く）
-
-**ダウンロード方法:**
-- 各ページでBOOTHのダウンロードボタンをクリックするだけ
-- **ファイル名の変更は不要です**（元のファイル名のままでOK）
-- Chrome拡張が自動的にファイルと商品IDを紐付けます
-
-**自動処理の流れ:**
-1. ZIPを一時フォルダに展開
-2. `.unitypackage` ファイルを検索
-3. 以下のディレクトリに配置：
-   - `Assets/ImportedAssets/booth_<ID>/package.unitypackage`（単一）
-   - `Assets/ImportedAssets/booth_<ID>/variant_1/package.unitypackage`（複数1番目）
-   - `Assets/ImportedAssets/booth_<ID>/variant_2/package.unitypackage`（複数2番目）
-4. Unityが自動でインポートダイアログを表示
-5. ユーザーが内容を確認してインポート
-
-詳細は以下を参照：
-- [MULTIPLE_DOWNLOADS.md](MULTIPLE_DOWNLOADS.md) - 複数ダウンロード完全ガイド
-- [UI_GUIDE.md](UI_GUIDE.md) - Unity UI詳細ガイド
+**マテリアル:**
+- 別ボタンで表示
+- 「マテリアル」「マテリアル 2」など
 
 ---
 
-## 📂 プロジェクト構成
+## 📁 ディレクトリ構造
 
 ```
 Booth_Import_Assistant/
-├── .gitignore                  # Git除外設定
-│
-├── Bridge/                     # Node.jsローカルサーバー
-│   ├── bridge.js               # メインサーバースクリプト
-│   ├── package.json            # Node.js依存関係
-│   ├── .npmrc                  # npm設定
-│   ├── README.md               # Bridge詳細ガイド
-│   └── node_modules/           # npm install で生成（.gitignore）
-│
-├── BoothExtension/             # ブラウザ拡張機能（Chrome/Edge）
-│   ├── manifest.json           # 拡張機能設定（Manifest V3）
-│   ├── content.js              # DOM解析・全ページ自動巡回
-│   ├── background.js           # ダウンロード監視（Service Worker）
-│   ├── README.md               # インストール・使用方法
-│   ├── DEBUG.md                # デバッグ方法
-│   └── ICONS_README.txt        # アイコン配置方法
-│
-├── UnityExtension/             # Unity Editor拡張
-│   └── Editor/
-│       ├── BridgeManager.cs            # Bridge起動・終了管理
-│       ├── BoothLibraryWindow.cs       # メインUIウィンドウ
-│       └── BoothImportAssistant.asmdef # Assembly Definition
-│
-├── BoothBridge/                # 実行時生成ディレクトリ（.gitignore）
-│   ├── .gitkeep                # ディレクトリ保持用
-│   ├── booth_assets.json       # 購入リストデータ（実行時生成）
-│   ├── booth_assets.backup.json # バックアップ（実行時生成）
-│   └── thumbnails/             # サムネイル画像（実行時生成）
-│
-├── Assets/ImportedAssets/      # ダウンロードアセット展開先（.gitignore）
-│   └── .gitkeep                # ディレクトリ保持用
-│       └── booth_<ID>/         # 商品IDごとのディレクトリ（実行時生成）
-│           ├── *.unitypackage  # 抽出された.unitypackage
-│           └── variant_*/      # 複数バリエーション用サブフォルダ
-│
-├── README.md                   # このファイル
-├── CHANGELOG.md                # 変更履歴
-├── INSTALL.md                  # インストール詳細ガイド
-├── MAC_SETUP.md                # Mac専用セットアップガイド
-├── PAGINATION.md               # 全ページ自動巡回機能ガイド
-├── MULTIPLE_DOWNLOADS.md       # 複数ダウンロードリンク対応ガイド
-├── UI_GUIDE.md                 # Unity UI詳細ガイド
-├── AUTO_DOWNLOAD.md            # 自動ダウンロード特定機能ガイド
-├── REQUIREMENTS_CHECK.md       # 要件定義チェックリスト
-├── REQUIREMENTS_COMPARISON.md  # 要件定義との比較表
-└── LICENSE                     # ライセンス情報
+  ├─ Assets/
+  │   └─ BoothImportAssistant/      ← VCCパッケージ本体
+  │       ├─ Editor/                Unity Editor拡張
+  │       │   ├─ BridgeManager.cs
+  │       │   ├─ BoothLibraryWindow.cs
+  │       │   └─ BoothImportAssistant.asmdef
+  │       ├─ Bridge/                Node.jsサーバー
+  │       │   ├─ bridge.js
+  │       │   ├─ package.json
+  │       │   ├─ node_modules/      npm依存関係
+  │       │   └─ node-runtime/      Node.js実行環境（組み込み）
+  │       │       ├─ win-x64/       Windows用
+  │       │       ├─ osx-x64/       macOS用
+  │       │       └─ linux-x64/     Linux用
+  │       ├─ package.json           VCC用パッケージ定義
+  │       └─ README.md
+  │
+  ├─ BoothExtension/                ブラウザ拡張機能（別途インストール）
+  │   ├─ manifest.json
+  │   ├─ content.js
+  │   └─ background.js
+  │
+  ├─ BoothBridge/                   実行時生成（プロジェクトルート直下）
+  │   ├─ booth_assets.json          アセット情報
+  │   ├─ thumbnails/                サムネイル画像
+  │   └─ temp/                      一時ファイル
+  │
+  ├─ README.md
+  └─ LICENSE
 ```
-
-### 📝 ディレクトリの説明
-
-| ディレクトリ | 説明 | Git管理 |
-|------------|------|---------|
-| `Bridge/` | Node.jsローカルサーバー | ✅ 管理対象 |
-| `BoothExtension/` | Chrome/Edge拡張機能 | ✅ 管理対象 |
-| `UnityExtension/` | Unity Editor拡張 | ✅ 管理対象 |
-| `BoothBridge/` | 実行時データ保存先 | ❌ .gitignore |
-| `Assets/ImportedAssets/` | アセット展開先 | ❌ .gitignore |
-| `node_modules/` | Node.js依存関係 | ❌ .gitignore |
 
 ---
 
@@ -224,29 +137,34 @@ Booth_Import_Assistant/
 ```
 1. Unity「同期」ボタン
    ↓
-2. Bridgeが起動（Node.js）
+2. Bridge自動起動（Node.js）
    ↓
-3. BOOTHページが開く
+3. BOOTHライブラリページが開く
    ↓
-4. 拡張機能がDOM解析
+4. 拡張機能が全ページを自動巡回
    ↓
-5. Bridgeへ自動POST
+5. Bridgeへデータ送信
    ↓
-6. JSON保存・サムネDL
+6. JSON保存・サムネイルDL
    ↓
 7. Unity UIが自動更新
+   ↓
+8. ダウンロード検知
+   ↓
+9. 自動展開・インポート
+   ↓
+10. 完了！
 ```
 
 ---
 
-## ⚙️ 保存先
+## 🔧 必要なもの
 
-### Unity プロジェクト内
+- Unity 2022.3 以上
+- Chrome または Edge ブラウザ
+- BOOTHアカウント
 
-- `<ProjectRoot>/BoothBridge/booth_assets.json` - 購入リストデータ
-- `<ProjectRoot>/BoothBridge/thumbnails/` - サムネイル画像
-- `<ProjectRoot>/BoothBridge/booth_assets.backup.json` - バックアップ（1世代）
-- `<ProjectRoot>/Assets/ImportedAssets/booth_<ID>/` - 展開されたアセット
+**注意**: Node.jsは**パッケージに組み込まれています**。追加インストールは不要です！
 
 ---
 
@@ -254,48 +172,37 @@ Booth_Import_Assistant/
 
 ### Bridgeが起動しない
 
-**原因**: Node.jsがインストールされていない、またはPATHが通っていない
+**Windows:**
+1. Unity コンソールでエラーメッセージを確認
+2. `Assets/BoothImportAssistant/Bridge/node-runtime/win-x64/node.exe` が存在するか確認
 
-**対処（Windows）**:
-1. コマンドプロンプトで `node --version` を実行
-2. エラーが出る場合は Node.js を再インストール
-3. Unity を再起動
+**Mac/Linux:**
+システムのNode.jsにフォールバックします。Node.jsをインストールしてください:
+```bash
+# Mac (Homebrew)
+brew install node
 
-**対処（Mac）**:
-1. ターミナルで `node --version` を実行
-2. エラーが出る場合は以下を確認：
-   - Homebrew経由: `brew install node`
-   - 公式サイトからインストール: https://nodejs.org/
-3. Unity を再起動
+# Linux
+sudo apt install nodejs
+```
 
 ### ブラウザ拡張が動作しない
 
-**原因**: 拡張機能が正しくインストールされていない
-
-**対処**:
-1. `chrome://extensions/` でインストール状態を確認
-2. エラーが表示されている場合は、拡張機能を削除して再インストール
-3. デベロッパーモードが有効になっているか確認
+1. `chrome://extensions/` で拡張機能が有効か確認
+2. デベロッパーモードが有効か確認
+3. ブラウザを再起動
 
 ### 同期ボタンを押してもデータが表示されない
 
-**原因**: BOOTHページの構造が変更された可能性
-
-**対処**:
 1. ブラウザの開発者ツール（F12）を開く
 2. Console タブで `[BOOTH Import]` のログを確認
-3. エラーが表示されている場合は、Issue を報告
+3. BOOTHにログインしているか確認
 
-### ZIP自動展開が動作しない
+### 自動インポートが動作しない
 
-**原因**: ファイル名が規定の形式になっていない
-
-**対処**:
-1. ダウンロードしたZIPファイル名を確認
-2. `booth_<商品ID>.zip` の形式に手動でリネーム
-3. 「ダウンロード」フォルダに配置
-   - Windows: `C:\Users\<ユーザー名>\Downloads`
-   - Mac: `/Users/<ユーザー名>/Downloads`
+1. Unity コンソールでエラーを確認
+2. `BoothBridge/temp/` フォルダが存在するか確認
+3. .unitypackageファイルが正しく配置されているか確認
 
 ---
 
@@ -313,26 +220,46 @@ Booth_Import_Assistant/
 
 ---
 
+## 📝 技術スタック
+
+- **Unity Editor拡張**: C#
+- **Bridge サーバー**: Node.js v20
+- **ブラウザ拡張**: JavaScript (Manifest V3)
+- **通信**: HTTP (localhost:4823)
+- **データ形式**: JSON
+
+---
+
+## 🛠️ 開発者向け
+
+### ビルド・テスト
+
+```bash
+# Bridge の依存関係インストール
+cd Assets/BoothImportAssistant/Bridge
+npm install
+
+# Unityでテスト
+# Tools > BOOTH Library を開く
+```
+
+### Node.jsバイナリの更新
+
+詳細は `Assets/BoothImportAssistant/Bridge/node-runtime/README.md` を参照。
+
+---
+
 ## 📝 ライセンス
 
-MIT License
+MIT License - 詳細は [LICENSE](LICENSE) を参照
+
+**Node.js**: MIT License (組み込みバイナリ)
 
 ---
 
-## 🛠️ 今後の開発予定
+## 🤝 貢献
 
-- v1.0: 基本機能 + Mac対応 ✅
-- v1.1: FileSystemWatcherによるリアルタイム更新 ✅
-- v1.2: キャッシュ削除ボタン / タグ分類
-- v2.0: Linux対応
-- v2.1: 自動ポート選択
-- v2.2: カテゴリフィルタ・検索機能
-
----
-
-## 💬 サポート
-
-Issue・Pull Request をお待ちしています。
+プルリクエストは歓迎します！バグ報告や機能要望はIssuesで受け付けています。
 
 ---
 
@@ -343,5 +270,12 @@ Issue・Pull Request をお待ちしています。
 
 ---
 
-**Enjoy your VRChat creation! 🎨**
+## 🔗 リンク
 
+- **GitHub**: https://github.com/natuki53/Booth_Import_Assistant
+- **BOOTH**: https://booth.pm/
+- **VCC**: https://vcc.docs.vrchat.com/
+
+---
+
+**Enjoy your VRChat creation! 🎨✨**

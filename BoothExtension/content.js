@@ -34,74 +34,252 @@ logInfo('ページURL:', location.href);
 logInfo('Bridge URL:', BRIDGE_URL);
 
 /**
- * 指定されたDocumentオブジェクトから商品情報を解析（既存ロジック維持）
+ * 指定されたDocumentオブジェクトから商品情報を解析（BOOTHの実際のHTML構造に完全対応）
  */
 function extractBoothItemsFromDOM(doc, processedIds = new Set()) {
   const items = [];
   
   try {
-    // 商品リンク（/items/を含むリンク）をすべて取得
-    const itemLinks = doc.querySelectorAll('a[href*="/items/"]');
+    // 商品カード全体を直接取得
+    // BOOTHの実際の構造: div.mb-16.bg-white.p-16.desktop:rounded-8.desktop:py-24.desktop:px-40
+    const itemCards = doc.querySelectorAll('div.mb-16.bg-white.p-16');
     
-    console.log('[BOOTH Import] 商品リンク検出:', itemLinks.length, '件');
+    console.log('[BOOTH Import] 商品カード検出:', itemCards.length, '件');
     
-    itemLinks.forEach((link) => {
+    if (itemCards.length === 0) {
+      console.warn('[BOOTH Import] ⚠️ 商品カードが見つかりません。ページ構造が変更された可能性があります。');
+      return [];
+    }
+    
+    itemCards.forEach((card, index) => {
       try {
-        // 商品IDを抽出
-        const match = link.href.match(/\/items\/(\d+)/);
-        if (!match) return;
+        console.log('[BOOTH Import] === 商品カード', index + 1, '/', itemCards.length, '解析開始 ===');
+        
+        // 1. 商品ページリンクとIDを取得
+        // タイトルのリンク: a[target="_blank"] で /items/ を含むもの
+        const productLink = card.querySelector('a[target="_blank"][href*="/items/"]');
+        if (!productLink) {
+          console.warn('[BOOTH Import]   ⚠️ 商品リンクが見つかりません');
+          return;
+        }
+        
+        const match = productLink.href.match(/\/items\/(\d+)/);
+        if (!match) {
+          console.warn('[BOOTH Import]   ⚠️ 商品IDを抽出できません:', productLink.href);
+          return;
+        }
         
         const productId = match[1];
         const boothId = `booth_${productId}`;
         
         // 重複チェック
         if (processedIds.has(boothId)) {
+          console.log('[BOOTH Import]   スキップ: 既に処理済み', boothId);
           return;
         }
         processedIds.add(boothId);
         
-        // 商品タイトル（リンクのテキスト）
-        const title = link.textContent.trim() || '商品名不明';
+        console.log('[BOOTH Import]   商品ID:', productId);
+        console.log('[BOOTH Import]   商品URL:', productLink.href);
         
-        // 商品URL
-        const productUrl = link.href;
+        // 2. タイトル取得
+        // div.text-text-default.font-bold.text-16.mb-8.break-all
+        const titleDiv = card.querySelector('div.text-text-default.font-bold.text-16, div.font-bold.text-16');
+        const title = titleDiv ? titleDiv.textContent.trim() : '商品名不明';
+        console.log('[BOOTH Import]   タイトル:', title);
         
-        // 親要素または近隣要素から追加情報を取得
-        const parentElement = link.closest('div, li, article, section') || link.parentElement;
+        // 3. サムネイル取得
+        // img.l-library-item-thumbnail (高画質版)
+        const thumbnailImg = card.querySelector('img.l-library-item-thumbnail');
+        const thumbnailUrl = thumbnailImg ? thumbnailImg.src : '';
+        if (thumbnailUrl) {
+          console.log('[BOOTH Import]   サムネイル:', thumbnailUrl.substring(0, 60) + '...');
+        } else {
+          console.warn('[BOOTH Import]   ⚠️ サムネイルが見つかりません');
+        }
         
-        // 作者名（.booth.pmを含むリンクを探す）
+        // 4. 作者名取得
+        // div.text-14.text-text-gray600.break-all (作者名が入っているdiv)
         let author = '作者不明';
-        if (parentElement) {
-          const authorLink = parentElement.querySelector('a[href*=".booth.pm"]');
-          if (authorLink && !authorLink.href.includes('/items/')) {
-            author = authorLink.textContent.trim();
+        const authorDiv = card.querySelector('div.text-14.text-text-gray600.break-all');
+        if (authorDiv) {
+          author = authorDiv.textContent.trim();
+          console.log('[BOOTH Import]   作者:', author);
+        } else {
+          // フォールバック: .booth.pmを含むリンクから取得
+          const authorLink = card.querySelector('a[href*=".booth.pm"]:not([href*="/items/"])');
+          if (authorLink) {
+            // リンク内のdivまたはテキストから作者名を取得
+            const authorText = authorLink.querySelector('div.text-14');
+            author = authorText ? authorText.textContent.trim() : authorLink.textContent.trim();
+            console.log('[BOOTH Import]   作者（フォールバック）:', author);
+          } else {
+            console.warn('[BOOTH Import]   ⚠️ 作者情報が見つかりません');
           }
         }
         
-        // サムネイルURL（同じ親要素内のimg）
-        let thumbnailUrl = '';
-        if (parentElement) {
-          const imgElement = parentElement.querySelector('img');
-          if (imgElement && imgElement.src) {
-            thumbnailUrl = imgElement.src;
-          }
-        }
-        
-        // ダウンロードURL（/downloadablesを含むリンク）- 複数対応
+        // 5. ダウンロードリンク取得（複数対応・アバター別・マテリアル対応）
+        // 構造: div.mt-16.desktop:flex の中に、タイトル（div.min-w-0 > div.text-14）とリンク（div.mt-8 > a）がある
         let downloadUrls = [];
-        if (parentElement) {
-          const downloadLinks = parentElement.querySelectorAll('a[href*="/downloadables/"]');
-          downloadLinks.forEach((link) => {
-            if (link.href && !downloadUrls.some(dl => dl.url === link.href)) {
-              // リンクテキストも取得（アバター名識別用）
-              const linkText = link.textContent.trim();
+        
+        // div.mt-16.desktop:flex（またはdesktop:flexを含む）を探す
+        const downloadContainers = card.querySelectorAll('div.mt-16');
+        
+        console.log('[BOOTH Import]   ダウンロードコンテナ検索:', downloadContainers.length, '個');
+        
+        downloadContainers.forEach((container, containerIdx) => {
+          // このコンテナ内にダウンロードリンクがあるか確認
+          const downloadLink = container.querySelector('a[href*="downloadables"]');
+          
+          if (downloadLink && !downloadUrls.some(dl => dl.url === downloadLink.href)) {
+            // タイトル（ラベル）を取得
+            // div.min-w-0 > div.text-14 または div.text14 を探す
+            let label = 'ダウンロード';
+            
+            // 方法1: div.min-w-0 内の div.text-14 または div.text14
+            const minWidthDiv = container.querySelector('div.min-w-0, div[class*="min-w"]');
+            if (minWidthDiv) {
+              const labelDiv = minWidthDiv.querySelector('div.text-14, div.text14, div[class*="text-14"], div[class*="text14"]');
+              if (labelDiv) {
+                label = labelDiv.textContent.trim();
+                console.log('[BOOTH Import]     [方法1] ラベル取得成功（div.min-w-0内）:', label);
+              }
+            }
+            
+            // 方法2: コンテナ直下の div.text-14 または div.text14
+            if (label === 'ダウンロード') {
+              const labelDiv = container.querySelector('div.text-14, div.text14, div[class*="text-14"], div[class*="text14"]');
+              if (labelDiv) {
+                label = labelDiv.textContent.trim();
+                console.log('[BOOTH Import]     [方法2] ラベル取得成功（コンテナ直下）:', label);
+              }
+            }
+            
+            // 方法3: リンクの前の兄弟要素または親の兄弟要素を探す
+            if (label === 'ダウンロード') {
+              let sibling = downloadLink.parentElement;
+              for (let i = 0; i < 5 && sibling; i++) {
+                sibling = sibling.previousElementSibling;
+                if (sibling) {
+                  const labelDiv = sibling.querySelector('div.text-14, div.text14, div[class*="text-14"], div[class*="text14"]');
+                  if (labelDiv) {
+                    label = labelDiv.textContent.trim();
+                    console.log('[BOOTH Import]     [方法3] ラベル取得成功（兄弟要素）:', label);
+                    break;
+                  }
+                }
+              }
+            }
+            
+            // 方法4: リンクのテキスト
+            if (label === 'ダウンロード') {
+              const linkText = downloadLink.textContent.trim();
+              if (linkText && linkText !== '' && linkText.length < 100) {
+                label = linkText;
+                console.log('[BOOTH Import]     [方法4] ラベル取得（リンクテキスト）:', label);
+              }
+            }
+            
+            // マテリアルかどうかを判定（日本語・英語両対応）
+            const labelLower = label.toLowerCase();
+            const isMaterial = labelLower.includes('マテリアル') || 
+                              labelLower.includes('まてりある') ||
+                              labelLower.includes('material') ||
+                              labelLower.includes('共通') ||
+                              labelLower.includes('きょうつう') ||
+                              labelLower.includes('common') ||
+                              labelLower.includes('texture') ||
+                              labelLower.includes('テクスチャ') ||
+                              labelLower.includes('shader') ||
+                              labelLower.includes('シェーダー') ||
+                              // マテリアルファイル名のパターン
+                              labelLower.includes('mat_') ||
+                              labelLower.includes('_mat') ||
+                              labelLower.includes('textures') ||
+                              labelLower.includes('materials');
+            
+            downloadUrls.push({
+              url: downloadLink.href,
+              label: label,
+              isMaterial: isMaterial
+            });
+            
+            console.log('[BOOTH Import]   ダウンロードリンク [' + downloadUrls.length + ']:');
+            console.log('[BOOTH Import]     URL:', downloadLink.href);
+            console.log('[BOOTH Import]     ラベル:', label);
+            console.log('[BOOTH Import]     種類:', isMaterial ? '📦 マテリアル' : '👤 アバター');
+          }
+        });
+        
+        // ダウンロードリンクが見つからない場合、カード全体から探す
+        if (downloadUrls.length === 0) {
+          console.warn('[BOOTH Import]   ⚠️ 構造化されたダウンロードリンクが見つかりません');
+          const allDownloadLinks = card.querySelectorAll('a[href*="downloadables"]');
+          console.log('[BOOTH Import]   カード全体から再検索:', allDownloadLinks.length, '件');
+          
+          allDownloadLinks.forEach((dlLink, idx) => {
+            if (dlLink.href && !downloadUrls.some(dl => dl.url === dlLink.href)) {
+              // リンクの近くにあるテキストを探す（最大5階層まで遡る）
+              let label = 'ダウンロード';
+              let parent = dlLink.parentElement;
+              
+              for (let i = 0; i < 5 && parent; i++) {
+                const labelDiv = parent.querySelector('div.text-14, div.text14, div[class*="text-14"], div[class*="text14"]');
+                if (labelDiv) {
+                  label = labelDiv.textContent.trim();
+                  console.log('[BOOTH Import]     [フォールバック] ラベル取得（階層', i, '）:', label);
+                  break;
+                }
+                parent = parent.parentElement;
+              }
+              
+              const labelLower = label.toLowerCase();
+              const isMaterial = labelLower.includes('マテリアル') || 
+                                labelLower.includes('material') ||
+                                labelLower.includes('共通') ||
+                                labelLower.includes('common');
+              
               downloadUrls.push({
-                url: link.href,
-                label: linkText || 'ダウンロード'
+                url: dlLink.href,
+                label: label,
+                isMaterial: isMaterial
               });
+              
+              console.log('[BOOTH Import]   [フォールバック] ダウンロードリンク [' + downloadUrls.length + ']:');
+              console.log('[BOOTH Import]     URL:', dlLink.href);
+              console.log('[BOOTH Import]     ラベル:', label);
+              console.log('[BOOTH Import]     種類:', isMaterial ? '📦 マテリアル' : '👤 アバター');
             }
           });
         }
+        
+        // 並べ替え: アバター別を先に、マテリアルを後に
+        downloadUrls.sort((a, b) => {
+          if (a.isMaterial && !b.isMaterial) return 1;  // マテリアルを後ろに
+          if (!a.isMaterial && b.isMaterial) return -1; // マテリアルを後ろに
+          return 0;
+        });
+        
+        console.log('[BOOTH Import]   ===================');
+        console.log('[BOOTH Import]   ダウンロードリンク合計:', downloadUrls.length, '件');
+        if (downloadUrls.length > 1) {
+          const materialCount = downloadUrls.filter(dl => dl.isMaterial).length;
+          const avatarCount = downloadUrls.length - materialCount;
+          console.log('[BOOTH Import]   内訳:');
+          console.log('[BOOTH Import]     👤 アバター別: ' + avatarCount + '件 (Unity側: プルダウン表示)');
+          console.log('[BOOTH Import]     📦 マテリアル: ' + materialCount + '件 (Unity側: 必ず別表示)');
+          
+          // 各ダウンロードリンクの一覧を表示
+          downloadUrls.forEach((dl, idx) => {
+            console.log('[BOOTH Import]     [' + (idx + 1) + '] ' + (dl.isMaterial ? '📦' : '👤') + ' ' + dl.label);
+          });
+          
+          console.log('[BOOTH Import]   ---');
+          console.log('[BOOTH Import]   Unity UI表示方針:');
+          console.log('[BOOTH Import]   - アバター別（isMaterial: false）: すべてプルダウンメニューに');
+          console.log('[BOOTH Import]   - マテリアル（isMaterial: true）: 必ず別枠で表示');
+        }
+        console.log('[BOOTH Import]   ===================');
         
         // 購入日（現在の日付）
         const purchaseDate = new Date().toISOString().split('T')[0];
@@ -111,9 +289,9 @@ function extractBoothItemsFromDOM(doc, processedIds = new Set()) {
           id: boothId,
           title: title,
           author: author,
-          productUrl: productUrl,
+          productUrl: productLink.href,
           thumbnailUrl: thumbnailUrl,
-          downloadUrls: downloadUrls, // 配列形式
+          downloadUrls: downloadUrls,
           purchaseDate: purchaseDate,
           localThumbnail: `BoothBridge/thumbnails/${boothId}.jpg`,
           installed: false,
@@ -123,22 +301,28 @@ function extractBoothItemsFromDOM(doc, processedIds = new Set()) {
         
         items.push(item);
         
-        console.log('[BOOTH Import] 商品解析成功:', {
+        console.log('[BOOTH Import] ✓ 商品解析完了:', {
           id: boothId,
-          title: title.substring(0, 30) + (title.length > 30 ? '...' : ''),
+          title: title.substring(0, 40) + (title.length > 40 ? '...' : ''),
           author: author,
-          downloads: downloadUrls.length + '件'
+          downloads: downloadUrls.length + '件',
+          thumbnail: thumbnailUrl ? 'あり' : 'なし'
         });
         
       } catch (e) {
-        console.error('[BOOTH Import] 商品解析エラー:', e);
+        console.error('[BOOTH Import] 商品カード解析エラー:', e.message);
+        console.error('[BOOTH Import] スタック:', e.stack);
       }
     });
     
   } catch (e) {
-    console.error('[BOOTH Import] DOM解析エラー:', e);
+    console.error('[BOOTH Import] DOM解析エラー:', e.message);
+    console.error('[BOOTH Import] スタック:', e.stack);
   }
   
+  console.log('[BOOTH Import] =========================');
+  console.log('[BOOTH Import] 解析完了: 全', items.length, '件');
+  console.log('[BOOTH Import] =========================');
   return items;
 }
 
@@ -514,10 +698,11 @@ function sendDownloadMapToBackground(items) {
 }
 
 /**
- * 自動同期処理（非同期対応）
+ * 同期処理（非同期対応）
+ * Unityから明示的に呼び出された場合のみ実行
  */
-async function autoSync() {
-  logInfo('=== 自動同期処理開始 ===');
+async function performSync() {
+  logInfo('=== 同期処理開始 ===');
   
   // URLチェック（manage.booth.pm または accounts.booth.pm）
   const validHosts = ['manage.booth.pm', 'accounts.booth.pm'];
@@ -537,7 +722,7 @@ async function autoSync() {
     return;
   }
   
-  logInfo('✓ ページ確認OK - 自動同期を開始します');
+  logInfo('✓ ページ確認OK - 同期を開始します');
   
   // DOM読み込み待機
   logDebug(`DOM読み込み待機中（${WAIT_TIME}ms）...`);
@@ -573,7 +758,7 @@ async function autoSync() {
     // ダウンロードURLマップをbackground.jsに送信
     sendDownloadMapToBackground(items);
     
-    logInfo('=== 自動同期処理完了 ===');
+    logInfo('=== 同期処理完了 ===');
     
   } catch (e) {
     hideProgressNotification();
@@ -584,10 +769,33 @@ async function autoSync() {
   }
 }
 
-// ページ読み込み完了時に実行
+// ページ読み込み完了時の処理
+// Unityから開かれた場合のみ同期（URLパラメータで判定）
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', autoSync);
+  document.addEventListener('DOMContentLoaded', checkAndSync);
 } else {
-  autoSync();
+  checkAndSync();
 }
+
+function checkAndSync() {
+  logInfo('=== Content Script 初期化 ===');
+  
+  // URLパラメータをチェック
+  const urlParams = new URLSearchParams(window.location.search);
+  const shouldSync = urlParams.get('sync') === 'true';
+  
+  if (shouldSync) {
+    logInfo('✓ Unity起動による同期を検出: 同期を開始します');
+    // URLパラメータを削除（履歴に残さないため）
+    if (window.history && window.history.replaceState) {
+      const cleanUrl = window.location.pathname + window.location.hash;
+      window.history.replaceState({}, document.title, cleanUrl);
+    }
+    performSync();
+  } else {
+    logInfo('手動でページを開いた場合: 同期は実行されません');
+    logInfo('Unity側の「同期」ボタンから同期してください');
+  }
+}
+
 

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.IO;
 using UnityEditor;
@@ -15,12 +15,10 @@ namespace BoothImportAssistant
     {
         private static Process bridgeProcess;
         private static string projectPath;
-        private static bool isInitialized = false;
 
         static BridgeManager()
         {
             EditorApplication.quitting += OnEditorQuitting;
-            isInitialized = true;
         }
 
         /// <summary>

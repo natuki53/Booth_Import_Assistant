@@ -33,7 +33,7 @@ namespace BoothImportAssistant
         [MenuItem("Tools/BOOTH Library")]
         public static void ShowWindow()
         {
-            var window = GetWindow<BoothLibraryWindow>("BOOTH Library");
+            var window = GetWindow<BoothLibraryWindow>("BOOTH Import Assistant");
             window.minSize = new Vector2(500, 300);
             window.Show();
         }
@@ -141,7 +141,7 @@ namespace BoothImportAssistant
         {
             EditorGUILayout.Space(10);
             
-            GUILayout.Label("BOOTH Import Assistant", EditorStyles.boldLabel);
+            GUILayout.Label("BOOTH Library", EditorStyles.boldLabel);
             
             EditorGUILayout.Space(5);
             

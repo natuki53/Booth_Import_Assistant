@@ -32,7 +32,7 @@ VRChatアバター開発者向けの効率化ツールです。
 
 <div align="center">
 
-[![Add to VCC](https://natuki53.github.io/Booth_Import_Assistant/)]
+[Add to VCC](https://natuki53.github.io/Booth_Import_Assistant/)
 
 </div>
 

@@ -5,9 +5,12 @@ VRChatアバター開発者向けの効率化ツールです。
 
 <div align="center">
 
+[![Add to VCC](https://img.shields.io/badge/VCC%E3%81%AB%E8%BF%BD%E5%8A%A0-00ADD8?style=for-the-badge&logo=unity&logoColor=white)](vcc://vpm/addRepo?url=https://natuki53.github.io/Booth_Import_Assistant/index.json)
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Unity](https://img.shields.io/badge/Unity-2022.3%2B-blue.svg)](https://unity.com/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
+[![Version](https://img.shields.io/badge/Version-0.1.0--beta-orange.svg)](https://github.com/natuki53/Booth_Import_Assistant/releases)
 
 </div>
 
@@ -27,7 +30,25 @@ VRChatアバター開発者向けの効率化ツールです。
 
 ## 📦 インストール方法
 
-### VCC/ALCOM（VPMリポジトリ経由）を使用する場合（推奨）
+### 🚀 ワンクリックインストール（推奨）
+
+<div align="center">
+
+**VCCで開く:**
+
+[![Add to VCC](https://img.shields.io/badge/VCC%E3%81%AB%E8%BF%BD%E5%8A%A0-00ADD8?style=for-the-badge&logo=unity&logoColor=white)](vcc://vpm/addRepo?url=https://natuki53.github.io/Booth_Import_Assistant/index.json)
+
+</div>
+
+**使い方:**
+1. 上の「VCCに追加」ボタンをクリック
+2. VCCが自動起動してリポジトリが追加されます
+3. プロジェクトに移動して「BOOTH Import Assistant」を追加
+4. 完了！Node.jsのインストールは不要です 🎉
+
+---
+
+### 📝 手動でリポジトリを追加する場合
 
 1. **VCCまたはALCOMを開く**
 2. **Settings（設定）を開く**

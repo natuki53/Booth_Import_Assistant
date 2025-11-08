@@ -371,7 +371,8 @@ namespace BoothImportAssistant
                         // ドロップダウンで選択
                         int selectedIndex = EditorGUILayout.Popup(
                             selectedDownloadIndex[asset.id], 
-                            options
+                            options,
+                            GUILayout.Width(180)
                         );
                         
                         // 範囲チェック

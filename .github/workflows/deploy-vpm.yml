@@ -26,5 +26,5 @@ jobs:
           publish_dir: .
           publish_branch: gh-pages
           include_assets: |
-            index.json
+            vpm.json
 

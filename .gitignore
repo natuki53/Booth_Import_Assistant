@@ -71,7 +71,7 @@ Assets/ImportedAssets/
 *.bak
 
 # GitHub Pages - Auto-generated
-docs/index.json
+# docs/index.json (commented out to allow manual deployment)
 
 # Release packages (only in GitHub Releases)
 *.zip

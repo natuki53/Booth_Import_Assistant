@@ -25,6 +25,9 @@ namespace BoothImportAssistant
         private string jsonFilePath;
         private Texture2D placeholderIcon;
         private Queue<string> pendingPackageImports = new Queue<string>();
+        private List<string> detectedPackages = new List<string>();
+        private double lastPackageDetectionTime = 0;
+        private const double PACKAGE_DETECTION_DELAY = 2.0; // 2秒待機してから複数パッケージをスキャン
         
         // 複数ダウンロード用の選択状態
         private Dictionary<string, int> selectedDownloadIndex = new Dictionary<string, int>();
@@ -187,6 +190,69 @@ namespace BoothImportAssistant
                 showUpdateNotification = true;
                 notificationEndTime = EditorApplication.timeSinceStartup + 2.0;
                 Repaint();
+            }
+            
+            // 検出されたパッケージをチェック（一定時間経過後）
+            if (detectedPackages.Count > 0 && 
+                EditorApplication.timeSinceStartup - lastPackageDetectionTime >= PACKAGE_DETECTION_DELAY)
+            {
+                // tempフォルダ内のすべての.unitypackageファイルをスキャン
+                string tempPackagePath = Path.Combine(GetProjectPath(), "BoothBridge", "temp");
+                if (Directory.Exists(tempPackagePath))
+                {
+                    string[] allPackages = Directory.GetFiles(tempPackagePath, "*.unitypackage");
+                    
+                    // 検出されたパッケージと実際のファイルを比較
+                    List<string> packagesToImport = new List<string>();
+                    
+                    // 検出されたパッケージが存在する場合はそれを使用
+                    if (detectedPackages.Count > 0)
+                    {
+                        foreach (string detectedPackage in detectedPackages)
+                        {
+                            if (File.Exists(detectedPackage))
+                            {
+                                packagesToImport.Add(detectedPackage);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // 検出リストが空の場合は、すべてのパッケージを使用
+                        packagesToImport.AddRange(allPackages);
+                    }
+                    
+                    if (packagesToImport.Count > 0)
+                    {
+                        // 複数パッケージがある場合はダイアログを表示
+                        if (packagesToImport.Count > 1)
+                        {
+                            PackageImportDialog.ShowDialog(packagesToImport, (selectedPackages) =>
+                            {
+                                foreach (string package in selectedPackages)
+                                {
+                                    pendingPackageImports.Enqueue(package);
+                                }
+                            });
+                        }
+                        else
+                        {
+                            // 単一パッケージの場合は確認ダイアログを表示
+                            string packageName = Path.GetFileName(packagesToImport[0]);
+                            if (EditorUtility.DisplayDialog(
+                                "UnityPackageをインポートしますか？",
+                                $"以下のパッケージをインポートしますか？\n\n{packageName}",
+                                "インポート", "キャンセル"))
+                            {
+                                pendingPackageImports.Enqueue(packagesToImport[0]);
+                            }
+                        }
+                    }
+                }
+                
+                // 検出リストをクリア
+                detectedPackages.Clear();
+                lastPackageDetectionTime = 0;
             }
             
             // .unitypackageファイルの自動インポート
@@ -665,13 +731,16 @@ namespace BoothImportAssistant
             // ファイルが完全に書き込まれるまで少し待つ
             System.Threading.Thread.Sleep(500);
             
-            // インポートキューに追加
-            lock (pendingPackageImports)
-            {
-                pendingPackageImports.Enqueue(e.FullPath);
-            }
-            
             Debug.Log("[BoothBridge] .unitypackage検出: " + e.FullPath);
+            
+            // 検出時刻を記録
+            lastPackageDetectionTime = EditorApplication.timeSinceStartup;
+            
+            // 検出されたパッケージをリストに追加（重複チェック）
+            if (!detectedPackages.Contains(e.FullPath))
+            {
+                detectedPackages.Add(e.FullPath);
+            }
         }
 
         private void ImportUnityPackage(string packagePath)
@@ -807,6 +876,127 @@ namespace BoothImportAssistant
     public class BoothAssetListWrapper
     {
         public BoothAsset[] items;
+    }
+
+    /// <summary>
+    /// UnityPackageインポート選択ダイアログ
+    /// </summary>
+    public class PackageImportDialog : EditorWindow
+    {
+        private List<string> packagePaths;
+        private Dictionary<string, bool> packageSelections;
+        private System.Action<List<string>> onImport;
+        private Vector2 scrollPosition;
+
+        public static void ShowDialog(List<string> packages, System.Action<List<string>> callback)
+        {
+            var window = GetWindow<PackageImportDialog>(true, "UnityPackageをインポート");
+            window.packagePaths = packages;
+            window.onImport = callback;
+            window.packageSelections = new Dictionary<string, bool>();
+            
+            // すべてデフォルトで選択
+            foreach (string package in packages)
+            {
+                window.packageSelections[package] = true;
+            }
+            
+            window.minSize = new Vector2(500, 400);
+            window.Show();
+        }
+
+        private void OnGUI()
+        {
+            EditorGUILayout.Space(10);
+            
+            EditorGUILayout.LabelField("以下のUnityPackageをインポートしますか？", EditorStyles.boldLabel);
+            EditorGUILayout.Space(5);
+            
+            scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
+            
+            foreach (string packagePath in packagePaths)
+            {
+                EditorGUILayout.BeginHorizontal();
+                
+                string fileName = Path.GetFileName(packagePath);
+                bool isSelected = packageSelections.ContainsKey(packagePath) && packageSelections[packagePath];
+                
+                // チェックボックス
+                bool newSelection = EditorGUILayout.Toggle(isSelected, GUILayout.Width(20));
+                packageSelections[packagePath] = newSelection;
+                
+                // ファイル名とサイズ
+                if (File.Exists(packagePath))
+                {
+                    FileInfo fileInfo = new FileInfo(packagePath);
+                    long fileSizeMB = fileInfo.Length / 1024 / 1024;
+                    EditorGUILayout.LabelField($"{fileName} ({fileSizeMB} MB)", 
+                        newSelection ? EditorStyles.label : EditorStyles.miniLabel);
+                }
+                else
+                {
+                    EditorGUILayout.LabelField(fileName, EditorStyles.miniLabel);
+                }
+                
+                EditorGUILayout.EndHorizontal();
+            }
+            
+            EditorGUILayout.EndScrollView();
+            
+            EditorGUILayout.Space(10);
+            EditorGUILayout.LabelField("", GUI.skin.horizontalSlider);
+            EditorGUILayout.Space(10);
+            
+            // ボタン
+            EditorGUILayout.BeginHorizontal();
+            
+            // すべて選択/解除
+            int selectedCount = packageSelections.Values.Count(v => v);
+            if (GUILayout.Button(selectedCount == packagePaths.Count ? "すべて解除" : "すべて選択", 
+                GUILayout.Height(30)))
+            {
+                bool selectAll = selectedCount != packagePaths.Count;
+                foreach (string package in packagePaths)
+                {
+                    packageSelections[package] = selectAll;
+                }
+            }
+            
+            GUILayout.FlexibleSpace();
+            
+            // キャンセル
+            if (GUILayout.Button("キャンセル", GUILayout.Height(30), GUILayout.Width(100)))
+            {
+                Close();
+            }
+            
+            // インポート
+            GUI.enabled = selectedCount > 0;
+            if (GUILayout.Button("選択したものをインポート", GUILayout.Height(30), GUILayout.Width(180)))
+            {
+                List<string> selectedPackages = new List<string>();
+                foreach (var kvp in packageSelections)
+                {
+                    if (kvp.Value)
+                    {
+                        selectedPackages.Add(kvp.Key);
+                    }
+                }
+                
+                if (onImport != null)
+                {
+                    onImport(selectedPackages);
+                }
+                
+                Close();
+            }
+            
+            GUI.enabled = true;
+            
+            EditorGUILayout.EndHorizontal();
+            
+            EditorGUILayout.Space(5);
+        }
     }
 }
 

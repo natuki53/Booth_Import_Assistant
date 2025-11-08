@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BOOTH Import Assistant - BOOTHからUnityへダイレクトインポート</title>
+    <meta name="description" content="BOOTHライブラリから直接Unityプロジェクトにアセットをインポートするツール。VRChatアバター開発者向けの効率化ツール。">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        header {
+            padding: 40px 0;
+            text-align: center;
+        }
+
+        .logo {
+            font-size: 3rem;
+            font-weight: bold;
+            color: white;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .tagline {
+            font-size: 1.5rem;
+            color: rgba(255,255,255,0.9);
+            margin-bottom: 40px;
+        }
+
+        /* Hero Section */
+        .hero {
+            background: white;
+            border-radius: 20px;
+            padding: 60px 40px;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            margin-bottom: 60px;
+        }
+
+        .hero h1 {
+            font-size: 2.5rem;
+            color: #2d3748;
+            margin-bottom: 20px;
+        }
+
+        .hero p {
+            font-size: 1.2rem;
+            color: #4a5568;
+            margin-bottom: 40px;
+        }
+
+        .cta-buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 15px 40px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            text-decoration: none;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+
+        .btn-secondary {
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+
+        .btn-secondary:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        /* Features */
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-bottom: 60px;
+        }
+
+        .feature-card {
+            background: white;
+            border-radius: 15px;
+            padding: 40px 30px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: transform 0.3s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 20px;
+        }
+
+        .feature-card h3 {
+            font-size: 1.5rem;
+            color: #2d3748;
+            margin-bottom: 15px;
+        }
+
+        .feature-card p {
+            color: #4a5568;
+            font-size: 1rem;
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 40px 0;
+            color: rgba(255,255,255,0.8);
+        }
+
+        footer a {
+            color: white;
+            text-decoration: none;
+            margin: 0 15px;
+            transition: opacity 0.3s;
+        }
+
+        footer a:hover {
+            opacity: 0.7;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .logo {
+                font-size: 2rem;
+            }
+
+            .tagline {
+                font-size: 1.2rem;
+            }
+
+            .hero h1 {
+                font-size: 1.8rem;
+            }
+
+            .hero p {
+                font-size: 1rem;
+            }
+
+            .cta-buttons {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">📦 BOOTH Import Assistant</div>
+            <div class="tagline">BOOTHからUnityへダイレクトインポート</div>
+        </header>
+
+        <main>
+            <section class="hero">
+                <h1>VRChatアバター開発を効率化</h1>
+                <p>BOOTHで購入したアセットを、ワンクリックでUnityプロジェクトにインポート。<br>面倒な手動作業から解放されます。</p>
+                <div class="cta-buttons">
+                    <a href="vcc://vpm/addRepo?url=https://natuki53.github.io/Booth_Import_Assistant/index.json" class="btn btn-primary">
+                        🚀 VCCに追加
+                    </a>
+                    <a href="https://github.com/natuki53/Booth_Import_Assistant#readme" class="btn btn-secondary" target="_blank">
+                        📖 ドキュメント
+                    </a>
+                </div>
+            </section>
+
+            <section class="features">
+                <div class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <h3>完全自動化</h3>
+                    <p>ダウンロード、ZIP展開、.unitypackage検出、インポートまで全自動。プログレスバーでリアルタイム進捗表示。</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">💎</div>
+                    <h3>Node.js組み込み済み</h3>
+                    <p>追加インストール不要！Node.jsランタイムをパッケージに同梱。Windows/macOS/Linux完全対応。</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🎨</div>
+                    <h3>アバター改変者向け</h3>
+                    <p>複数ダウンロード対応。アバター別・マテリアル別に自動分類。サムネイル表示で視覚的に管理。</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🔒</div>
+                    <h3>セキュア設計</h3>
+                    <p>完全ローカル動作。外部通信なし。Cookie・トークン不要。安心して使えます。</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🚀</div>
+                    <h3>VCC対応</h3>
+                    <p>VRChat Creator Companion対応。ワンクリックでインストール。プロジェクトごとに管理可能。</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🌐</div>
+                    <h3>クロスプラットフォーム</h3>
+                    <p>Windows、macOS、Linuxで動作。どの環境でも同じように使えます。</p>
+                </div>
+            </section>
+
+            <section class="hero" style="padding: 40px;">
+                <h2 style="margin-bottom: 20px; color: #2d3748;">インストール方法</h2>
+                <ol style="text-align: left; max-width: 600px; margin: 0 auto; color: #4a5568;">
+                    <li style="margin-bottom: 10px;">上の「VCCに追加」ボタンをクリック</li>
+                    <li style="margin-bottom: 10px;">VCCが自動起動してリポジトリが追加されます</li>
+                    <li style="margin-bottom: 10px;">プロジェクトに移動して「BOOTH Import Assistant」を追加</li>
+                    <li>完了！Unity エディタで Tools → BOOTH Library から使用開始</li>
+                </ol>
+            </section>
+        </main>
+
+        <footer>
+            <p>
+                <a href="https://github.com/natuki53/Booth_Import_Assistant" target="_blank">GitHub</a>
+                <a href="https://github.com/natuki53/Booth_Import_Assistant/releases" target="_blank">Releases</a>
+                <a href="https://github.com/natuki53/Booth_Import_Assistant/issues" target="_blank">Issues</a>
+            </p>
+            <p style="margin-top: 20px;">© 2024 natuki. MIT License</p>
+        </footer>
+    </div>
+</body>
+</html>
+

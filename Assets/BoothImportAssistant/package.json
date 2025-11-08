@@ -1,7 +1,7 @@
 {
   "name": "com.natuki.booth-import-assistant",
   "displayName": "BOOTH Import Assistant",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "unity": "2022.3",
   "description": "BOOTHライブラリから直接Unityプロジェクトにアセットをインポートするツール。VRChatアバター開発者向けの効率化ツールです。Node.js組み込み済み。",
   "keywords": [

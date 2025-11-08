@@ -1,0 +1,27 @@
+{
+  "name": "com.natuki.booth-import-assistant",
+  "displayName": "BOOTH Import Assistant",
+  "version": "1.0.0",
+  "unity": "2022.3",
+  "description": "BOOTHライブラリから直接Unityプロジェクトにアセットをインポートするツール。VRChatアバター開発者向けの効率化ツールです。Node.js組み込み済み。",
+  "keywords": [
+    "BOOTH",
+    "VRChat",
+    "Import",
+    "Asset Management",
+    "アバター",
+    "衣装"
+  ],
+  "author": {
+    "name": "natuki",
+    "email": "hiiraginatuki53@gmail.com",
+    "url": "https://github.com/natuki53"
+  },
+  "url": "https://github.com/natuki53/Booth_Import_Assistant",
+  "repo": "https://github.com/natuki53/Booth_Import_Assistant.git",
+  "license": "MIT",
+  "vpmDependencies": {},
+  "legacyFolders": {},
+  "legacyFiles": {}
+}
+

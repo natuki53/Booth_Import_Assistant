@@ -21,8 +21,6 @@ namespace BoothImportAssistant
         {
             EditorApplication.quitting += OnEditorQuitting;
             isInitialized = true;
-            
-            Debug.Log("[BoothBridge] BridgeManager初期化完了");
         }
 
         /// <summary>
@@ -30,71 +28,43 @@ namespace BoothImportAssistant
         /// </summary>
         public static bool StartBridge()
         {
-            // 既に起動中の場合
             if (bridgeProcess != null && !bridgeProcess.HasExited)
             {
-                Debug.Log("[BoothBridge] Bridgeは既に起動しています");
                 return true;
             }
 
-            // プロジェクトパス取得
             projectPath = GetProjectPath();
             if (string.IsNullOrEmpty(projectPath))
             {
-                Debug.LogWarning("[BoothBridge][ERROR] プロジェクトパスを取得できません。プロジェクトを保存してください。");
+                Debug.LogError("[BoothBridge] プロジェクトパスを取得できません");
                 EditorUtility.DisplayDialog("エラー", 
                     "プロジェクトが保存されていません。\nプロジェクトを保存してから再試行してください。", 
                     "OK");
                 return false;
             }
 
-            // Node.js確認
             string nodePath = FindNodePath();
             if (string.IsNullOrEmpty(nodePath))
             {
-                Debug.LogError("[BoothBridge][ERROR] Node.jsが見つかりません。");
-                Debug.LogError("[BoothBridge][ERROR] 検索したパス:");
-                Debug.LogError("[BoothBridge][ERROR]   - 環境変数PATH");
-                Debug.LogError("[BoothBridge][ERROR]   - /usr/local/bin/node (Homebrew Intel)");
-                Debug.LogError("[BoothBridge][ERROR]   - /opt/homebrew/bin/node (Homebrew Apple Silicon)");
-                Debug.LogError("[BoothBridge][ERROR]   - /usr/bin/node (システム)");
-                Debug.LogError("[BoothBridge][ERROR] 解決方法: https://nodejs.org/ からNode.js v18以上をインストール");
-                
+                Debug.LogError("[BoothBridge] Node.js (v18+) が見つかりません - https://nodejs.org/");
                 EditorUtility.DisplayDialog("エラー", 
-                    "Node.js (v18以上) がインストールされていません。\n\nhttps://nodejs.org/ からインストールしてください。\n\n詳細はUnityコンソールを確認してください。", 
+                    "Node.js (v18以上) がインストールされていません。\n\nhttps://nodejs.org/ からインストールしてください。", 
                     "OK");
                 return false;
             }
-            
-            Debug.Log("[BoothBridge] Node.js検出: " + nodePath);
 
-            // bridge.jsのパス（UnityExtensionフォルダの外にあるBridge）
             string bridgeScriptPath = GetBridgeScriptPath();
-            Debug.Log("[BoothBridge] bridge.jsパス: " + bridgeScriptPath);
-            
             if (!File.Exists(bridgeScriptPath))
             {
-                Debug.LogError("[BoothBridge][ERROR] bridge.jsが見つかりません: " + bridgeScriptPath);
-                Debug.LogError("[BoothBridge][ERROR] 期待されるディレクトリ構造:");
-                Debug.LogError("[BoothBridge][ERROR]   Assets/");
-                Debug.LogError("[BoothBridge][ERROR]   └── BoothImportAssistant/");
-                Debug.LogError("[BoothBridge][ERROR]       ├── Editor/");
-                Debug.LogError("[BoothBridge][ERROR]       │   ├── BridgeManager.cs");
-                Debug.LogError("[BoothBridge][ERROR]       │   └── BoothLibraryWindow.cs");
-                Debug.LogError("[BoothBridge][ERROR]       └── Bridge/");
-                Debug.LogError("[BoothBridge][ERROR]           └── bridge.js");
-                
+                Debug.LogError("[BoothBridge] bridge.jsが見つかりません: " + bridgeScriptPath);
                 EditorUtility.DisplayDialog("エラー", 
-                    "bridge.js が見つかりません。\n\n期待されるパス:\n" + bridgeScriptPath + "\n\nBridgeフォルダが正しく配置されているか確認してください。", 
+                    "bridge.js が見つかりません。\n\n期待されるパス:\n" + bridgeScriptPath, 
                     "OK");
                 return false;
             }
-            
-            Debug.Log("[BoothBridge] bridge.js検出成功");
 
             try
             {
-                // プロセス起動
                 ProcessStartInfo startInfo = new ProcessStartInfo
                 {
                     FileName = nodePath,
@@ -107,7 +77,6 @@ namespace BoothImportAssistant
 
                 bridgeProcess = new Process { StartInfo = startInfo };
                 
-                // 出力をUnityコンソールにリダイレクト
                 bridgeProcess.OutputDataReceived += (sender, args) =>
                 {
                     if (!string.IsNullOrEmpty(args.Data))
@@ -128,33 +97,23 @@ namespace BoothImportAssistant
                 bridgeProcess.BeginOutputReadLine();
                 bridgeProcess.BeginErrorReadLine();
 
-                // 起動確認（500ms待機）
                 System.Threading.Thread.Sleep(500);
 
                 if (bridgeProcess.HasExited)
                 {
-                    Debug.LogError("[BoothBridge][ERROR] Bridgeの起動に失敗しました");
-                    Debug.LogError("[BoothBridge][ERROR] プロセスが即座に終了しました");
-                    Debug.LogError("[BoothBridge][ERROR] 考えられる原因:");
-                    Debug.LogError("[BoothBridge][ERROR]   1. Node.jsのバージョンが古い（v18以上が必要）");
-                    Debug.LogError("[BoothBridge][ERROR]   2. 依存パッケージがインストールされていない（npm installを実行）");
-                    Debug.LogError("[BoothBridge][ERROR]   3. ポート4823が既に使用されている");
-                    Debug.LogError("[BoothBridge][ERROR]   4. bridge.jsに構文エラーがある");
-                    
+                    Debug.LogError("[BoothBridge] Bridge起動失敗 - Node.js v18+が必要、またはポート4823が使用中");
                     EditorUtility.DisplayDialog("エラー", 
                         "Bridgeの起動に失敗しました。\n\nUnityコンソールで詳細を確認してください。", 
                         "OK");
                     return false;
                 }
 
-                Debug.Log("[BoothBridge] ✓ Bridge起動成功");
-                Debug.Log("[BoothBridge] プロセスID: " + bridgeProcess.Id);
-                Debug.Log("[BoothBridge] サーバーURL: http://localhost:4823");
+                Debug.Log("[BoothBridge] Bridge起動成功 (PID: " + bridgeProcess.Id + ")");
                 return true;
             }
             catch (Exception ex)
             {
-                Debug.LogError("[BoothBridge][ERROR] Bridge起動エラー: " + ex.Message);
+                Debug.LogError("[BoothBridge] Bridge起動エラー: " + ex.Message);
                 EditorUtility.DisplayDialog("エラー", 
                     "Bridgeの起動に失敗しました。\n\n" + ex.Message, 
                     "OK");
@@ -174,7 +133,6 @@ namespace BoothImportAssistant
                     bridgeProcess.Kill();
                     bridgeProcess.Dispose();
                     bridgeProcess = null;
-                    Debug.Log("[BoothBridge] Bridge終了");
                 }
                 catch (Exception ex)
                 {
@@ -214,11 +172,8 @@ namespace BoothImportAssistant
             string bundledNode = GetBundledNodePath();
             if (!string.IsNullOrEmpty(bundledNode) && File.Exists(bundledNode))
             {
-                Debug.Log("[BoothBridge] バンドルされたNode.jsを使用: " + bundledNode);
                 return bundledNode;
             }
-            
-            Debug.Log("[BoothBridge] バンドルされたNode.jsが見つかりません。システムのNode.jsを検索します。");
             
             // 2. システムのNode.jsをフォールバック
             // Windows
@@ -309,7 +264,6 @@ namespace BoothImportAssistant
 
         private static string GetBundledNodePath()
         {
-            // Assets/BoothImportAssistant/Bridge/node-runtime/ からNode.jsを取得
             string bridgeScriptPath = GetBridgeScriptPath();
             if (string.IsNullOrEmpty(bridgeScriptPath))
             {
@@ -320,13 +274,9 @@ namespace BoothImportAssistant
             string runtimeFolder = Path.Combine(bridgeFolder, "node-runtime");
             
             #if UNITY_EDITOR_WIN
-                string nodePath = Path.Combine(runtimeFolder, "win-x64", "node.exe");
-                Debug.Log("[BoothBridge] バンドルNode.jsパス（Windows）: " + nodePath);
-                return nodePath;
+                return Path.Combine(runtimeFolder, "win-x64", "node.exe");
             #elif UNITY_EDITOR_OSX
                 string nodePath = Path.Combine(runtimeFolder, "osx-x64", "node");
-                Debug.Log("[BoothBridge] バンドルNode.jsパス（Mac）: " + nodePath);
-                // Mac/Linuxの場合は実行権限を確認・設定
                 if (File.Exists(nodePath))
                 {
                     try
@@ -339,16 +289,11 @@ namespace BoothImportAssistant
                         process.Start();
                         process.WaitForExit();
                     }
-                    catch (Exception e)
-                    {
-                        Debug.LogWarning("[BoothBridge] 実行権限の設定に失敗: " + e.Message);
-                    }
+                    catch { }
                 }
                 return nodePath;
             #elif UNITY_EDITOR_LINUX
                 string nodePath = Path.Combine(runtimeFolder, "linux-x64", "node");
-                Debug.Log("[BoothBridge] バンドルNode.jsパス（Linux）: " + nodePath);
-                // Mac/Linuxの場合は実行権限を確認・設定
                 if (File.Exists(nodePath))
                 {
                     try
@@ -361,10 +306,7 @@ namespace BoothImportAssistant
                         process.Start();
                         process.WaitForExit();
                     }
-                    catch (Exception e)
-                    {
-                        Debug.LogWarning("[BoothBridge] 実行権限の設定に失敗: " + e.Message);
-                    }
+                    catch { }
                 }
                 return nodePath;
             #else

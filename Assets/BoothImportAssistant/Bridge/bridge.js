@@ -4,6 +4,7 @@ const path = require('path');
 const https = require('https');
 const AdmZip = require('adm-zip');
 const os = require('os');
+const { execSync } = require('child_process');
 
 // ログレベル
 const LOG_LEVEL = {
@@ -67,8 +68,55 @@ const JSON_FILE = path.join(BRIDGE_DIR, 'booth_assets.json');
 const BACKUP_FILE = path.join(BRIDGE_DIR, 'booth_assets.backup.json');
 const TEMP_PACKAGE_DIR = path.join(BRIDGE_DIR, 'temp'); // 一時的な.unitypackage配置場所
 
-// ダウンロードフォルダ（Windows/Mac/Linux対応）
-const DOWNLOADS_DIR = path.join(os.homedir(), 'Downloads');
+// ダウンロードフォルダを取得（Windows/Mac/Linux対応）
+function getDownloadsFolder() {
+  // Windowsの場合、shell:downloadsを解決
+  if (os.platform() === 'win32') {
+    try {
+      // 方法1: Shell.Application COMオブジェクトでshell:downloadsを解決
+      try {
+        const shellResult = execSync('powershell -Command "(New-Object -ComObject Shell.Application).NameSpace(\'shell:Downloads\').Self.Path"', {
+          encoding: 'utf8',
+          stdio: ['pipe', 'pipe', 'pipe'],
+          timeout: 5000
+        }).trim();
+        
+        if (shellResult && fs.existsSync(shellResult)) {
+          logDebug('Shell.Applicationでダウンロードフォルダを取得:', shellResult);
+          return shellResult;
+        }
+      } catch (shellError) {
+        // Shell.Application失敗時は次の方法を試す
+      }
+      
+      // 方法2: レジストリから取得（shell:downloadsで変更された場合も対応）
+      try {
+        const regResult = execSync('powershell -Command "(Get-ItemProperty -Path \'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Folders\' -Name \'{374DE290-123F-4565-9164-39C4925E467B}\' -ErrorAction SilentlyContinue).\'{374DE290-123F-4565-9164-39C4925E467B}\'"', {
+          encoding: 'utf8',
+          stdio: ['pipe', 'pipe', 'pipe'],
+          timeout: 5000
+        }).trim();
+        
+        if (regResult && fs.existsSync(regResult)) {
+          logDebug('レジストリからダウンロードフォルダを取得:', regResult);
+          return regResult;
+        }
+      } catch (regError) {
+        // レジストリアクセス失敗時は無視
+      }
+    } catch (error) {
+      // PowerShell実行失敗時はフォールバック
+      logWarn('PowerShellでダウンロードフォルダを取得できませんでした。デフォルトパスを使用します。');
+    }
+  }
+  
+  // Mac/Linux、またはWindowsでフォールバック
+  const defaultPath = path.join(os.homedir(), 'Downloads');
+  logDebug('デフォルトのダウンロードフォルダを使用:', defaultPath);
+  return defaultPath;
+}
+
+const DOWNLOADS_DIR = getDownloadsFolder();
 
 logInfo('=== ディレクトリ設定 ===');
 logDebug('BRIDGE_DIR:', BRIDGE_DIR);

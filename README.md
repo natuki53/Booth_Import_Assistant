@@ -32,7 +32,7 @@ VRChatアバター開発者向けの効率化ツールです。
 
 <div align="center">
 
-[![Add to VCC](https://img.shields.io/badge/VCC%E3%81%AB%E8%BF%BD%E5%8A%A0-00ADD8?style=for-the-badge&logo=unity&logoColor=white)](vcc://vpm/addRepo?url=https://natuki53.github.io/Booth_Import_Assistant/index.json)
+[![Add to VCC](https://natuki53.github.io/Booth_Import_Assistant/)]
 
 </div>
 
@@ -98,43 +98,6 @@ VRChatアバター開発者向けの効率化ツールです。
 **マテリアル:**
 - 別ボタンで表示
 - 「マテリアル」「マテリアル 2」など
-
----
-
-## ディレクトリ構造
-
-```
-Booth_Import_Assistant/
-  ├─ Assets/
-  │   └─ BoothImportAssistant/      ← VCCパッケージ本体
-  │       ├─ Editor/                Unity Editor拡張
-  │       │   ├─ BridgeManager.cs
-  │       │   ├─ BoothLibraryWindow.cs
-  │       │   └─ BoothImportAssistant.asmdef
-  │       ├─ Bridge/                Node.jsサーバー
-  │       │   ├─ bridge.js
-  │       │   ├─ package.json
-  │       │   ├─ node_modules/      npm依存関係
-  │       │   └─ node-runtime/      Node.js実行環境（組み込み）
-  │       │       ├─ win-x64/       Windows用
-  │       │       ├─ osx-x64/       macOS用
-  │       │       └─ linux-x64/     Linux用
-  │       ├─ package.json           VCC用パッケージ定義
-  │       └─ README.md
-  │
-  ├─ BoothExtension/                ブラウザ拡張機能（別途インストール）
-  │   ├─ manifest.json
-  │   ├─ content.js
-  │   └─ background.js
-  │
-  ├─ BoothBridge/                   実行時生成（プロジェクトルート直下）
-  │   ├─ booth_assets.json          アセット情報
-  │   ├─ thumbnails/                サムネイル画像
-  │   └─ temp/                      一時ファイル
-  │
-  ├─ README.md
-  └─ LICENSE
-```
 
 ---
 

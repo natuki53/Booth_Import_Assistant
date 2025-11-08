@@ -21,6 +21,14 @@ namespace BoothImportAssistant
         private bool showUpdateNotification = false;
         private double notificationEndTime = 0;
         private double lastRepaintTime = 0;
+        
+        // タブ関連
+        private int selectedTab = 0; // 0: 購入した商品, 1: ギフト
+        private string[] tabNames = new string[] { "購入した商品", "ギフト" };
+        
+        // ページネーション関連
+        private int currentPage = 0;
+        private const int itemsPerPage = 20;
 
         [MenuItem("Tools/BOOTH Library")]
         public static void ShowWindow()
@@ -92,6 +100,9 @@ namespace BoothImportAssistant
 
             // ヘッダー
             DrawHeader();
+            
+            // タブUI
+            DrawTabs();
 
             // 更新通知
             if (showUpdateNotification && EditorApplication.timeSinceStartup < notificationEndTime)
@@ -140,12 +151,14 @@ namespace BoothImportAssistant
             if (GUILayout.Button("同期", GUILayout.Height(30), GUILayout.Width(100)))
             {
                 presenter.SyncWithBooth();
+                currentPage = 0; // ページを最初にリセット
             }
             
             // 再読み込みボタン
             if (GUILayout.Button("再読み込み", GUILayout.Height(30), GUILayout.Width(100)))
             {
                 presenter.ReloadAssets();
+                currentPage = 0; // ページを最初にリセット
                 Repaint();
             }
             
@@ -174,6 +187,24 @@ namespace BoothImportAssistant
             EditorGUILayout.Space(5);
         }
 
+        private void DrawTabs()
+        {
+            EditorGUILayout.BeginHorizontal();
+            
+            int newSelectedTab = GUILayout.Toolbar(selectedTab, tabNames, GUILayout.Height(30));
+            
+            // タブが変更されたらページをリセット
+            if (newSelectedTab != selectedTab)
+            {
+                selectedTab = newSelectedTab;
+                currentPage = 0;
+                scrollPosition = Vector2.zero;
+            }
+            
+            EditorGUILayout.EndHorizontal();
+            EditorGUILayout.Space(5);
+        }
+
         private void DrawEmptyState()
         {
             EditorGUILayout.Space(50);
@@ -189,10 +220,48 @@ namespace BoothImportAssistant
 
         private void DrawAssetList()
         {
+            // 選択されたタブに応じてアセットをフィルタリング
+            string filterSource = selectedTab == 0 ? "purchased" : "gift";
+            var filteredAssets = presenter.Assets
+                .Where(asset => 
+                {
+                    // sourceフィールドがない古いデータは購入として扱う
+                    if (string.IsNullOrEmpty(asset.source))
+                    {
+                        return filterSource == "purchased";
+                    }
+                    return asset.source == filterSource;
+                })
+                .ToList();
+            
+            // ページネーション計算
+            int totalAssets = filteredAssets.Count;
+            int totalPages = Mathf.CeilToInt((float)totalAssets / itemsPerPage);
+            
+            // ページ範囲の補正
+            if (currentPage >= totalPages && totalPages > 0)
+            {
+                currentPage = totalPages - 1;
+            }
+            if (currentPage < 0)
+            {
+                currentPage = 0;
+            }
+            
+            // 現在のページのアセットを取得
+            int startIndex = currentPage * itemsPerPage;
+            int endIndex = Mathf.Min(startIndex + itemsPerPage, totalAssets);
+            var currentPageAssets = filteredAssets.Skip(startIndex).Take(endIndex - startIndex).ToList();
+            
+            // ページネーションコントロール（上部のみ）
+            DrawPaginationControls(totalAssets, totalPages);
+            
+            EditorGUILayout.Space(5);
+            
             // 縦スクロールバーのみ表示（横スクロールバーは非表示）
             scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
 
-            foreach (var asset in presenter.Assets)
+            foreach (var asset in currentPageAssets)
             {
                 DrawAssetItem(asset);
             }
@@ -222,10 +291,8 @@ namespace BoothImportAssistant
             // ===== 中央：情報（余った幅を使用、長いテキストは改行） =====
             EditorGUILayout.BeginVertical();
             
-            // タイトル（改行対応）
-            GUIStyle titleStyle = new GUIStyle(EditorStyles.boldLabel);
-            titleStyle.wordWrap = true;
-            GUILayout.Label(asset.title, titleStyle);
+            // タイトル（クリック可能、ホバー時に青く表示）
+            DrawClickableTitle(asset);
             
             // 作者（改行対応）
             GUIStyle authorStyle = new GUIStyle(EditorStyles.miniLabel);
@@ -294,9 +361,9 @@ namespace BoothImportAssistant
                         for (int i = 0; i < avatarIndices.Count; i++)
                         {
                             string label = asset.downloadUrls[avatarIndices[i]].label;
-                            if (label.Length > 25)
+                            if (label.Length > 35)
                             {
-                                label = label.Substring(0, 22) + "...";
+                                label = label.Substring(0, 32) + "...";
                             }
                             options[i] = label;
                         }
@@ -335,7 +402,7 @@ namespace BoothImportAssistant
                     foreach (int index in materialIndices)
                     {
                         // マテリアルボタン（統一ラベル）
-                        string buttonLabel = materialIndices.Count > 1 ? $"マテリアル インポート {materialCount}" : "マテリアルインポート";
+                        string buttonLabel = materialIndices.Count > 1 ? $"マテリアル インポート {materialCount}" : "マテリアル インポート";
                         if (GUILayout.Button(buttonLabel, GUILayout.Height(24)))
                         {
                             presenter.DownloadAsset(asset, index);
@@ -354,6 +421,103 @@ namespace BoothImportAssistant
             }
 
             EditorGUILayout.EndVertical(); // ボタンエリア終了
+        }
+
+        private void DrawPaginationControls(int totalAssets, int totalPages)
+        {
+            if (totalPages <= 1) return; // ページが1つ以下の場合は表示しない
+            
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.FlexibleSpace();
+            
+            // 前のページボタン
+            GUI.enabled = currentPage > 0;
+            if (GUILayout.Button("◀ 前へ", GUILayout.Width(80), GUILayout.Height(25)))
+            {
+                currentPage--;
+                scrollPosition = Vector2.zero; // スクロール位置をリセット
+            }
+            GUI.enabled = true;
+            
+            GUILayout.Space(10);
+            
+            // ページ情報表示
+            int startItem = currentPage * itemsPerPage + 1;
+            int endItem = Mathf.Min((currentPage + 1) * itemsPerPage, totalAssets);
+            GUIStyle pageInfoStyle = new GUIStyle(GUI.skin.label);
+            pageInfoStyle.alignment = TextAnchor.MiddleCenter;
+            pageInfoStyle.fontStyle = FontStyle.Bold;
+            GUILayout.Label($"ページ {currentPage + 1} / {totalPages}  ({startItem}-{endItem} / {totalAssets}件)", pageInfoStyle, GUILayout.Width(200));
+            
+            GUILayout.Space(10);
+            
+            // 次のページボタン
+            GUI.enabled = currentPage < totalPages - 1;
+            if (GUILayout.Button("次へ ▶", GUILayout.Width(80), GUILayout.Height(25)))
+            {
+                currentPage++;
+                scrollPosition = Vector2.zero; // スクロール位置をリセット
+            }
+            GUI.enabled = true;
+            
+            GUILayout.FlexibleSpace();
+            EditorGUILayout.EndHorizontal();
+        }
+
+        private void DrawClickableTitle(BoothAsset asset)
+        {
+            // タイトルスタイルを作成
+            GUIStyle titleStyle = new GUIStyle(EditorStyles.boldLabel);
+            titleStyle.wordWrap = true;
+            
+            // タイトルの高さを計算
+            GUIContent titleContent = new GUIContent(asset.title);
+            float titleHeight = titleStyle.CalcHeight(titleContent, EditorGUIUtility.currentViewWidth - 300);
+            
+            // タイトル領域を取得
+            Rect titleRect = EditorGUILayout.GetControlRect(false, titleHeight);
+            
+            // イベント処理
+            Event currentEvent = Event.current;
+            
+            // マウスホバー判定
+            bool isHovered = titleRect.Contains(currentEvent.mousePosition);
+            
+            // Repaint時にホバースタイルを適用
+            if (currentEvent.type == EventType.Repaint)
+            {
+                if (isHovered)
+                {
+                    // ホバー時は青色で描画
+                    GUIStyle hoveredStyle = new GUIStyle(titleStyle);
+                    hoveredStyle.normal.textColor = new Color(0.3f, 0.5f, 0.9f); // 青色
+                    hoveredStyle.Draw(titleRect, titleContent, false, false, false, false);
+                }
+                else
+                {
+                    // 通常時は通常色で描画
+                    titleStyle.Draw(titleRect, titleContent, false, false, false, false);
+                }
+            }
+            
+            // カーソル変更
+            if (isHovered)
+            {
+                EditorGUIUtility.AddCursorRect(titleRect, MouseCursor.Link);
+            }
+            
+            // クリック処理
+            if (currentEvent.type == EventType.MouseDown && currentEvent.button == 0 && isHovered)
+            {
+                Application.OpenURL(asset.productUrl);
+                currentEvent.Use();
+            }
+            
+            // ホバー時やマウス移動時は再描画
+            if (isHovered || currentEvent.type == EventType.MouseMove)
+            {
+                Repaint();
+            }
         }
 
         private string GetProjectPath()

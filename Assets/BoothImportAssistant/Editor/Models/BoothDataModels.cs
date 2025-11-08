@@ -44,6 +44,7 @@ namespace BoothImportAssistant.Models
         public bool installed;
         public string importPath;
         public string notes;
+        public string source;  // "purchased" or "gift"
     }
 
     /// <summary>

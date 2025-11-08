@@ -3,7 +3,9 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-package-lock.json
+
+# Note: Node.js runtime binaries (node.exe, node) are included for VCC distribution
+# バイナリをコミットに含める = VCC配布に含まれる
 
 # Unity
 [Ll]ibrary/

@@ -28,8 +28,6 @@ VRChatアバター開発者向けの効率化ツールです。
 
 ## インストール方法
 
-### ワンクリックインストール（推奨）
-
 <div align="center">
 
 [Add to VCC](https://natuki53.github.io/Booth_Import_Assistant/)

@@ -1,17 +1,16 @@
 {
   "manifest_version": 3,
   "name": "BOOTH Import Assistant",
-  "version": "0.1.1-beta",
+  "version": "0.1.0",
   "description": "BOOTH購入リストをUnityに同期するための拡張機能",
+  "icons": {
+    "16": "icon16.png",
+    "32": "icon32.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
   "permissions": [
-    "activeTab",
     "downloads"
-  ],
-  "host_permissions": [
-    "https://manage.booth.pm/*",
-    "https://accounts.booth.pm/*",
-    "https://booth.pm/*",
-    "https://*.booth.pm/*"
   ],
   "background": {
     "service_worker": "background.js"

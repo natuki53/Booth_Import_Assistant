@@ -6,15 +6,7 @@
 
 const BRIDGE_URL = 'http://localhost:49729';
 
-// ログヘルパー関数
-function logInfo(...args) {
-  console.log('[BOOTH-BG]', ...args);
-}
-
-function logWarn(...args) {
-  console.warn('[BOOTH-BG]', ...args);
-}
-
+// ログヘルパー関数（エラーのみ）
 function logError(...args) {
   console.error('[BOOTH-BG]', ...args);
 }
@@ -63,11 +55,12 @@ chrome.downloads.onCreated.addListener(async (downloadItem) => {
       }
     }
     
+    // 商品ID特定不可の場合はスキップ
     if (!downloadId && !boothId) {
-      logWarn('商品ID特定不可:', url.substring(0, 60));
       return;
     }
     
+    // ダウンロード追跡情報を保存
     downloadTracking.set(downloadItem.id, {
       url: url,
       downloadId: downloadId,
@@ -76,8 +69,6 @@ chrome.downloads.onCreated.addListener(async (downloadItem) => {
       filename: downloadItem.filename || 'unknown',
       startTime: Date.now()
     });
-    
-    logInfo('ダウンロード追跡:', boothId || downloadId);
   } catch (e) {
     logError('ダウンロード開始エラー:', e.message);
   }
@@ -96,15 +87,13 @@ chrome.downloads.onChanged.addListener(async (delta) => {
       tracking.filename = delta.filename.current;
     }
     
+    // ダウンロード完了時の処理
     if (delta.state && delta.state.current === 'complete') {
-      logInfo('ダウンロード完了:', tracking.boothId || tracking.downloadId);
-      
       // chrome.downloads.search()で完全なファイルパスを取得
       chrome.downloads.search({ id: delta.id }, async (items) => {
         if (items && items.length > 0) {
           const downloadItem = items[0];
           tracking.fullPath = downloadItem.filename; // 完全なファイルパス
-          logInfo('完全なファイルパス取得:', tracking.fullPath);
         }
         
         await notifyBridgeDownload(tracking);
@@ -112,11 +101,12 @@ chrome.downloads.onChanged.addListener(async (delta) => {
       });
     }
     
+    // ダウンロード中断時の処理
     if (delta.state && delta.state.current === 'interrupted') {
-      logWarn('ダウンロード中断:', tracking.boothId || tracking.downloadId);
       downloadTracking.delete(delta.id);
     }
     
+    // エラー時の処理
     if (delta.error) {
       logError('ダウンロードエラー:', tracking.boothId || tracking.downloadId, delta.error.current);
     }
@@ -133,28 +123,25 @@ async function notifyBridgeDownload(tracking) {
     const filename = tracking.filename.split(/[/\\]/).pop();
     const notifyData = {
       filename: filename,
-      fullPath: tracking.fullPath || tracking.filename, // 完全なファイルパスを追加
+      fullPath: tracking.fullPath || tracking.filename, // 完全なファイルパス
       downloadId: tracking.downloadId,
       boothId: tracking.boothId,
       url: tracking.url,
       timestamp: Date.now()
     };
     
-    logInfo('Bridge通知データ:', notifyData);
-    
+    // Bridgeサーバーに通知
     const response = await fetch(`${BRIDGE_URL}/download-notify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(notifyData)
     });
     
-    if (response.ok) {
-      logInfo('Bridge通知成功:', notifyData.boothId || notifyData.downloadId);
-    } else {
-      logWarn('Bridge通知失敗:', response.status);
+    if (!response.ok) {
+      logError('Bridge通知失敗:', response.status);
     }
   } catch (e) {
-    logError('Bridge通知エラー:', e.message);
+    // Bridgeが起動していない場合はスキップ
   }
 }
 
@@ -167,6 +154,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const downloadMap = message.data;
       downloadUrlMap.clear();
       
+      // ダウンロードURLと商品IDの対応を登録
       let totalUrls = 0;
       for (const [boothId, urls] of Object.entries(downloadMap)) {
         for (let i = 0; i < urls.length; i++) {
@@ -175,7 +163,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
       }
       
-      logInfo('URLマップ更新:', totalUrls, '個');
       sendResponse({ success: true, count: totalUrls });
     } catch (e) {
       logError('マップ更新エラー:', e.message);
@@ -186,7 +173,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ success: true });
   }
   else {
-    logWarn('未知のメッセージ:', message.type);
     sendResponse({ success: false, error: 'Unknown message type' });
   }
   

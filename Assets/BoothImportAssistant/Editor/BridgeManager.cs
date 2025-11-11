@@ -38,13 +38,10 @@ namespace BoothImportAssistant
             // 既存のプロセスが存在する場合、確実に停止してから新しいプロセスを起動
             if (bridgeProcess != null && !bridgeProcess.HasExited)
             {
-                Debug.Log("[BoothBridge] 既存のBridgeプロセスを停止してから新しいプロセスを起動します");
                 StopBridge();
             }
             
-            // プロセス参照が失われていても、ポート49729を使用しているプロセスを検出して終了
-            // （Unity再起動などでプロセス参照が失われた場合に対応）
-            Debug.Log("[BoothBridge] ポート49729を使用している既存のプロセスを確認します");
+            // ポート49729を使用しているプロセスを検出して終了
             KillProcessUsingPort(49729);
             System.Threading.Thread.Sleep(500); // プロセス終了を待機
 
@@ -113,14 +110,7 @@ namespace BoothImportAssistant
 
                 bridgeProcess = new Process { StartInfo = startInfo };
                 
-                bridgeProcess.OutputDataReceived += (sender, args) =>
-                {
-                    if (!string.IsNullOrEmpty(args.Data))
-                    {
-                        Debug.Log(args.Data);
-                    }
-                };
-                
+                // エラーのみ出力
                 bridgeProcess.ErrorDataReceived += (sender, args) =>
                 {
                     if (!string.IsNullOrEmpty(args.Data))
@@ -130,25 +120,19 @@ namespace BoothImportAssistant
                 };
 
                 bridgeProcess.Start();
-                bridgeProcess.BeginOutputReadLine();
                 bridgeProcess.BeginErrorReadLine();
 
                 System.Threading.Thread.Sleep(500);
 
                 if (bridgeProcess.HasExited)
                 {
-                    Debug.LogError("[BoothBridge] Bridge起動失敗 - Node.js v18+が必要、またはポート49729が使用中");
-                    
-                    // ポート49729を使用しているプロセスを検出して終了を試みる
+                    Debug.LogError("[BoothBridge] Bridge起動失敗");
                     KillProcessUsingPort(49729);
-                    
                     EditorUtility.DisplayDialog("エラー", 
-                        "Bridgeの起動に失敗しました。\n\nポート49729が使用中の可能性があります。\n既存のBridgeプロセスを終了してから再試行してください。\n\nUnityコンソールで詳細を確認してください。", 
+                        "Bridgeの起動に失敗しました。", 
                         "OK");
                     return false;
                 }
-
-                Debug.Log("[BoothBridge] Bridge起動成功 (PID: " + bridgeProcess.Id + ")");
                 // 起動成功時はキャッシュを更新
                 cachedBridgeRunningStatus = true;
                 lastPortCheckTime = EditorApplication.timeSinceStartup;
@@ -179,27 +163,17 @@ namespace BoothImportAssistant
             {
                 try
                 {
-                    Debug.Log("[BoothBridge] Bridge停止中...");
                     bridgeProcess.Kill();
                     
-                    // プロセスの終了を待機（最大5秒）
-                    // WaitForExit()はプロセスが終了するまで、またはタイムアウトまで待機する
                     if (!bridgeProcess.WaitForExit(5000))
                     {
-                        // タイムアウトした場合、HasExitedで最終確認
                         if (bridgeProcess.HasExited)
                         {
-                            Debug.Log("[BoothBridge] Bridge停止完了");
                             stopped = true;
-                        }
-                        else
-                        {
-                            Debug.LogWarning("[BoothBridge] Bridgeプロセスの終了待機がタイムアウトしました。プロセス参照をクリーンアップします。");
                         }
                     }
                     else
                     {
-                        Debug.Log("[BoothBridge] Bridge停止完了");
                         stopped = true;
                     }
                     
@@ -208,8 +182,7 @@ namespace BoothImportAssistant
                 }
                 catch (Exception ex)
                 {
-                    Debug.LogWarning("[BoothBridge] Bridge終了エラー: " + ex.Message);
-                    // エラーが発生してもプロセス参照をクリア
+                    Debug.LogError("[BoothBridge] Bridge終了エラー: " + ex.Message);
                     try
                     {
                         bridgeProcess?.Dispose();
@@ -219,11 +192,9 @@ namespace BoothImportAssistant
                 }
             }
             
-            // プロセス参照がない場合でも、ポート49729を使用しているプロセスを停止
-            // （Unity再起動などでプロセス参照が失われた場合に対応）
+            // ポート49729を使用しているプロセスを停止
             if (!stopped)
             {
-                Debug.Log("[BoothBridge] プロセス参照がないため、ポート49729を使用しているプロセスを検出して停止します");
                 KillProcessUsingPort(49729);
             }
         }
@@ -644,8 +615,6 @@ namespace BoothImportAssistant
                     StandardOutputEncoding = Encoding.UTF8,
                     StandardErrorEncoding = Encoding.UTF8
                 };
-
-                Debug.Log($"[BoothBridge] npm install実行中: {workingDirectory}");
                 
                 using (Process installProcess = Process.Start(installInfo))
                 {
@@ -658,15 +627,10 @@ namespace BoothImportAssistant
                     string error = installProcess.StandardError.ReadToEnd();
                     
                     installProcess.WaitForExit();
-
-                    if (!string.IsNullOrEmpty(output))
-                    {
-                        Debug.Log($"[BoothBridge] npm install出力:\n{output}");
-                    }
                     
                     if (!string.IsNullOrEmpty(error))
                     {
-                        Debug.LogWarning($"[BoothBridge] npm install警告:\n{error}");
+                        Debug.LogError($"[BoothBridge] npm install警告:\n{error}");
                     }
 
                     if (installProcess.ExitCode == 0)
@@ -728,15 +692,14 @@ namespace BoothImportAssistant
                                     Process process = Process.GetProcessById(pid);
                                     if (process.ProcessName.ToLower().Contains("node"))
                                     {
-                                        Debug.LogWarning($"[BoothBridge] ポート{port}を使用しているNode.jsプロセス (PID: {pid}) を終了します");
+                                        // Node.jsプロセスを終了
                                         process.Kill();
                                         process.WaitForExit(3000);
-                                        Debug.Log($"[BoothBridge] プロセス (PID: {pid}) を終了しました");
                                     }
                                 }
                                 catch (Exception ex)
                                 {
-                                    Debug.LogWarning($"[BoothBridge] プロセス (PID: {pid}) の終了に失敗: {ex.Message}");
+                                    Debug.LogError($"[BoothBridge] プロセス終了失敗: {ex.Message}");
                                 }
                             }
                         }
@@ -774,15 +737,14 @@ namespace BoothImportAssistant
                                     Process process = Process.GetProcessById(pid);
                                     if (process.ProcessName.ToLower().Contains("node"))
                                     {
-                                        Debug.LogWarning($"[BoothBridge] ポート{port}を使用しているNode.jsプロセス (PID: {pid}) を終了します");
+                                        // Node.jsプロセスを終了
                                         process.Kill();
                                         process.WaitForExit(3000);
-                                        Debug.Log($"[BoothBridge] プロセス (PID: {pid}) を終了しました");
                                     }
                                 }
                                 catch (Exception ex)
                                 {
-                                    Debug.LogWarning($"[BoothBridge] プロセス (PID: {pid}) の終了に失敗: {ex.Message}");
+                                    Debug.LogError($"[BoothBridge] プロセス終了失敗: {ex.Message}");
                                 }
                             }
                         }
@@ -791,7 +753,7 @@ namespace BoothImportAssistant
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[BoothBridge] ポート{port}を使用しているプロセスの検出に失敗: {ex.Message}");
+                Debug.LogError($"[BoothBridge] ポート検出失敗: {ex.Message}");
             }
         }
     }

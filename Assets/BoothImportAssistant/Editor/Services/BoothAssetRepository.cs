@@ -20,7 +20,33 @@ namespace BoothImportAssistant.Services
 
         public BoothAssetRepository(string projectPath)
         {
-            jsonFilePath = Path.Combine(projectPath, "BoothBridge", "booth_assets.json");
+            // AppDataディレクトリからJSONを読み込む
+            string appDataPath = GetAppDataPath();
+            jsonFilePath = Path.Combine(appDataPath, "booth_assets.json");
+        }
+        
+        /// <summary>
+        /// アプリケーションデータの保存先を取得（OS別）
+        /// </summary>
+        private static string GetAppDataPath()
+        {
+            string appDataPath;
+            
+            #if UNITY_EDITOR_WIN
+                // Windows: %LOCALAPPDATA%\Booth_Import_Assistant
+                string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                appDataPath = Path.Combine(localAppData, "Booth_Import_Assistant");
+            #elif UNITY_EDITOR_OSX
+                // Mac: ~/Library/Application Support/Booth_Import_Assistant
+                string home = Environment.GetFolderPath(Environment.SpecialFolder.Personal);
+                appDataPath = Path.Combine(home, "Library", "Application Support", "Booth_Import_Assistant");
+            #else
+                // Linux: ~/.config/Booth_Import_Assistant
+                string home = Environment.GetFolderPath(Environment.SpecialFolder.Personal);
+                appDataPath = Path.Combine(home, ".config", "Booth_Import_Assistant");
+            #endif
+            
+            return appDataPath;
         }
 
         public string GetJsonFilePath()
@@ -45,9 +71,6 @@ namespace BoothImportAssistant.Services
                 if (wrapper?.items != null)
                 {
                     assets = wrapper.items.OrderByDescending(a => a.purchaseDate).ToList();
-                    int installedCount = assets.Count(a => a.installed);
-                    Debug.Log($"[BoothBridge] アセット読み込み: {assets.Count}件 (インストール済み: {installedCount})");
-                    
                     OnAssetsChanged?.Invoke();
                     return true;
                 }
@@ -55,12 +78,6 @@ namespace BoothImportAssistant.Services
             catch (Exception ex)
             {
                 Debug.LogError($"[BoothBridge] JSON読み込みエラー: {ex.Message}");
-                
-                string backupPath = jsonFilePath.Replace(".json", ".backup.json");
-                if (File.Exists(backupPath))
-                {
-                    Debug.LogWarning("[BoothBridge] バックアップファイルが存在します");
-                }
             }
 
             return false;

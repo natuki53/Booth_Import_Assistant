@@ -38,9 +38,21 @@ namespace BoothImportAssistant.Services
             return texture;
         }
 
-        private Texture2D LoadThumbnailFromDisk(string relativePath)
+        private Texture2D LoadThumbnailFromDisk(string pathOrRelativePath)
         {
-            string fullPath = Path.Combine(projectPath, relativePath);
+            // 絶対パスかどうかを判定
+            string fullPath;
+            if (Path.IsPathRooted(pathOrRelativePath))
+            {
+                // 絶対パスの場合はそのまま使用
+                fullPath = pathOrRelativePath;
+            }
+            else
+            {
+                // 相対パスの場合はプロジェクトパスと結合（後方互換性のため）
+                fullPath = Path.Combine(projectPath, pathOrRelativePath);
+            }
+            
             if (!File.Exists(fullPath))
                 return null;
 

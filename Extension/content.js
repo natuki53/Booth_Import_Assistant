@@ -8,20 +8,10 @@
 const BRIDGE_URL = 'http://localhost:49729/sync';
 const WAIT_TIME = 3000; // DOM読み込み待機時間（ms）
 
-// ログヘルパー関数
-function logInfo(...args) {
-  console.log('[BOOTH]', ...args);
-}
-
-function logWarn(...args) {
-  console.warn('[BOOTH]', ...args);
-}
-
+// ログヘルパー関数（エラーのみ）
 function logError(...args) {
   console.error('[BOOTH]', ...args);
 }
-
-// Content Script 読み込み完了
 
 /**
  * 指定されたDocumentオブジェクトから商品情報を解析（BOOTHの実際のHTML構造に完全対応）
@@ -36,7 +26,6 @@ function extractBoothItemsFromDOM(doc, processedIds = new Set(), source = 'purch
     const itemCards = doc.querySelectorAll('div.mb-16.bg-white.p-16');
     
     if (itemCards.length === 0) {
-      logWarn('商品カードが見つかりません');
       return [];
     }
     
@@ -196,12 +185,12 @@ function extractBoothItemsFromDOM(doc, processedIds = new Set(), source = 'purch
         items.push(item);
         
       } catch (e) {
-        logError('商品カード解析エラー:', e.message);
+        // スキップ
       }
     });
     
   } catch (e) {
-    logError('DOM解析エラー:', e.message);
+    // スキップ
   }
   
   return items;
@@ -235,7 +224,6 @@ function getTotalPages(doc) {
     
     return maxPage;
   } catch (e) {
-    logError('ページ数取得エラー:', e);
     return 1;
   }
 }
@@ -259,7 +247,6 @@ async function fetchPageDOM(pageNum, path = '/library') {
     const parser = new DOMParser();
     return parser.parseFromString(html, 'text/html');
   } catch (e) {
-    logError('ページ取得エラー:', path, pageNum, e.message);
     return null;
   }
 }
@@ -368,7 +355,7 @@ async function extractBoothItems() {
       showProgressNotification(`✅ 取得完了 - 購入:${purchasedCount}件 ギフト:${giftCount}件`);
     }
   } catch (e) {
-    logError('全ページ取得エラー:', e.message);
+    // スキップ
   }
   
   return allItems;
@@ -389,7 +376,7 @@ function saveBoothLibraryJSON(items) {
     link.download = 'booth_library.json';
     link.click();
   } catch (e) {
-    logError('JSON保存エラー:', e.message);
+    // スキップ
   }
 }
 
@@ -402,15 +389,11 @@ async function syncToBridge(items) {
     });
     
     if (response.ok) {
-      const result = await response.json();
-      logInfo(`同期完了: ${items.length}件 (更新:${result.updated}, 追加:${result.added})`);
       showNotification('✅ Unityへの同期が完了しました！', 'success');
     } else {
-      logError('Bridge応答エラー:', response.status);
       showNotification('❌ Bridgeへの接続に失敗しました', 'error');
     }
   } catch (e) {
-    logError('Bridge送信エラー:', e.message);
     showNotification('❌ Unityが起動していません。Bridgeを起動してから再試行してください。', 'error');
   }
 }
@@ -521,12 +504,10 @@ function sendDownloadMapToBackground(items) {
       type: 'UPDATE_DOWNLOAD_MAP',
       data: downloadMap
     }, (response) => {
-      if (chrome.runtime.lastError) {
-        logWarn('Background通信エラー:', chrome.runtime.lastError.message);
-      }
+      // エラーは無視
     });
   } catch (e) {
-    logError('ダウンロードマップ送信エラー:', e.message);
+    // エラーは無視
   }
 }
 
@@ -534,31 +515,26 @@ async function performSync() {
   const validHosts = ['manage.booth.pm', 'accounts.booth.pm'];
   
   if (!validHosts.includes(location.hostname) || !location.pathname.startsWith('/library')) {
-    logWarn('BOOTHライブラリページではありません');
     return;
   }
   
   await new Promise(resolve => setTimeout(resolve, WAIT_TIME));
   
   try {
-    logInfo('同期開始');
     showProgressNotification('🔄 BOOTH商品を取得中...');
     
     const items = await extractBoothItems();
     hideProgressNotification();
     
     if (items.length === 0) {
-      logWarn('商品が見つかりませんでした');
       showNotification('⚠️ 商品が見つかりませんでした。ページを更新してください。', 'error');
       return;
     }
     
-    logInfo(`取得完了: ${items.length}件`);
     await syncToBridge(items);
     sendDownloadMapToBackground(items);
   } catch (e) {
     hideProgressNotification();
-    logError('同期エラー:', e.message);
     showNotification('❌ 同期中にエラーが発生しました', 'error');
   }
 }

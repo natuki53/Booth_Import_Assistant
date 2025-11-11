@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 using System.IO;
+using System.Text;
 using UnityEditor;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
@@ -61,6 +62,25 @@ namespace BoothImportAssistant
                 return false;
             }
 
+            // node_modulesが存在しない場合、npm installを実行
+            string bridgeFolder = Path.GetDirectoryName(bridgeScriptPath);
+            string nodeModulesPath = Path.Combine(bridgeFolder, "node_modules");
+            string packageJsonPath = Path.Combine(bridgeFolder, "package.json");
+            
+            if (File.Exists(packageJsonPath) && !Directory.Exists(nodeModulesPath))
+            {
+                Debug.Log("[BoothBridge] node_modulesが見つかりません。npm installを実行します...");
+                if (!InstallNodeModules(nodePath, bridgeFolder))
+                {
+                    Debug.LogError("[BoothBridge] npm installに失敗しました");
+                    EditorUtility.DisplayDialog("エラー", 
+                        "Node.jsの依存関係のインストールに失敗しました。\n\n手動で以下のコマンドを実行してください：\n\ncd \"" + bridgeFolder + "\"\nnpm install", 
+                        "OK");
+                    return false;
+                }
+                Debug.Log("[BoothBridge] npm installが完了しました");
+            }
+
             try
             {
                 ProcessStartInfo startInfo = new ProcessStartInfo
@@ -70,7 +90,9 @@ namespace BoothImportAssistant
                     UseShellExecute = false,
                     CreateNoWindow = true,
                     RedirectStandardOutput = true,
-                    RedirectStandardError = true
+                    RedirectStandardError = true,
+                    StandardOutputEncoding = Encoding.UTF8,
+                    StandardErrorEncoding = Encoding.UTF8
                 };
 
                 bridgeProcess = new Process { StartInfo = startInfo };
@@ -314,14 +336,163 @@ namespace BoothImportAssistant
 
         private static string GetBridgeScriptPath()
         {
-            // Assets/BoothImportAssistant/Editor/BridgeManager.cs から
-            // Assets/BoothImportAssistant/Bridge/bridge.js を探す
-            string scriptPath = new System.Diagnostics.StackTrace(true).GetFrame(0).GetFileName();
-            string editorFolder = Path.GetDirectoryName(scriptPath);
-            string boothImportAssistantFolder = Directory.GetParent(editorFolder).FullName;
-            string bridgePath = Path.Combine(boothImportAssistantFolder, "Bridge", "bridge.js");
+            // AssetDatabaseを使用してパスを取得（Unityのアセットパスは常にスラッシュを使用）
+            // VPM経由でインストールされた場合、Packages/から始まる可能性がある
+            string[] possiblePaths = new string[]
+            {
+                "Assets/BoothImportAssistant/Editor/BridgeManager.cs",
+                "Packages/com.natuki.booth-import-assistant/Editor/BridgeManager.cs"
+            };
             
-            return bridgePath;
+            foreach (string assetPath in possiblePaths)
+            {
+                string guid = AssetDatabase.AssetPathToGUID(assetPath);
+                if (!string.IsNullOrEmpty(guid))
+                {
+                    string bridgeManagerPath = AssetDatabase.GUIDToAssetPath(guid);
+                    // パスを正規化（バックスラッシュをスラッシュに変換）
+                    bridgeManagerPath = bridgeManagerPath.Replace('\\', '/');
+                    
+                    // アセットパスをファイルシステムパスに変換
+                    string fullPath;
+                    if (bridgeManagerPath.StartsWith("Assets/"))
+                    {
+                        fullPath = Path.GetFullPath(bridgeManagerPath.Replace("Assets/", Application.dataPath + "/"));
+                    }
+                    else if (bridgeManagerPath.StartsWith("Packages/"))
+                    {
+                        // Packages/はプロジェクトルートからの相対パス
+                        string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+                        fullPath = Path.GetFullPath(Path.Combine(projectRoot, bridgeManagerPath));
+                    }
+                    else
+                    {
+                        fullPath = Path.GetFullPath(bridgeManagerPath);
+                    }
+                    
+                    // パスを正規化
+                    fullPath = fullPath.Replace('\\', '/');
+                    string editorFolder = Path.GetDirectoryName(fullPath);
+                    string boothImportAssistantFolder = Directory.GetParent(editorFolder).FullName;
+                    string bridgePath = Path.Combine(boothImportAssistantFolder, "Bridge", "bridge.js");
+                    
+                    // パスを正規化（バックスラッシュをスラッシュに変換）
+                    return bridgePath.Replace('\\', '/');
+                }
+            }
+            
+            // フォールバック: StackTraceを使用
+            try
+            {
+                string scriptPath = new System.Diagnostics.StackTrace(true).GetFrame(0).GetFileName();
+                if (!string.IsNullOrEmpty(scriptPath))
+                {
+                    // パスを正規化（バックスラッシュをスラッシュに変換）
+                    scriptPath = scriptPath.Replace('\\', '/');
+                    string editorFolder = Path.GetDirectoryName(scriptPath);
+                    string boothImportAssistantFolder = Directory.GetParent(editorFolder).FullName;
+                    string bridgePath = Path.Combine(boothImportAssistantFolder, "Bridge", "bridge.js");
+                    
+                    // パスを正規化
+                    return bridgePath.Replace('\\', '/');
+                }
+            }
+            catch
+            {
+                // StackTrace取得に失敗した場合の処理
+            }
+            
+            // 最後のフォールバック: 相対パスから構築
+            string dataPath = Application.dataPath;
+            string fallbackPath = Path.Combine(dataPath, "BoothImportAssistant", "Bridge", "bridge.js");
+            return fallbackPath.Replace('\\', '/');
+        }
+
+        /// <summary>
+        /// node_modulesをインストール
+        /// </summary>
+        private static bool InstallNodeModules(string nodePath, string workingDirectory)
+        {
+            try
+            {
+                // npmコマンドのパスを取得
+                string npmPath;
+                string nodeDir = Path.GetDirectoryName(nodePath);
+                
+                if (Application.platform == RuntimePlatform.WindowsEditor)
+                {
+                    // Windows: まずnode.exeと同じディレクトリのnpm.cmdを確認
+                    npmPath = Path.Combine(nodeDir, "npm.cmd");
+                    if (!File.Exists(npmPath))
+                    {
+                        // npm.cmdが見つからない場合、システムのnpmを使用
+                        npmPath = "npm.cmd";
+                    }
+                }
+                else
+                {
+                    // Mac/Linux: nodeと同じディレクトリのnpm、またはシステムのnpm
+                    npmPath = Path.Combine(nodeDir, "npm");
+                    if (!File.Exists(npmPath))
+                    {
+                        // システムのnpmを使用
+                        npmPath = "npm";
+                    }
+                }
+
+                ProcessStartInfo installInfo = new ProcessStartInfo
+                {
+                    FileName = npmPath,
+                    Arguments = "install",
+                    WorkingDirectory = workingDirectory,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    StandardOutputEncoding = Encoding.UTF8,
+                    StandardErrorEncoding = Encoding.UTF8
+                };
+
+                Debug.Log($"[BoothBridge] npm install実行中: {workingDirectory}");
+                
+                using (Process installProcess = Process.Start(installInfo))
+                {
+                    if (installProcess == null)
+                    {
+                        return false;
+                    }
+
+                    string output = installProcess.StandardOutput.ReadToEnd();
+                    string error = installProcess.StandardError.ReadToEnd();
+                    
+                    installProcess.WaitForExit();
+
+                    if (!string.IsNullOrEmpty(output))
+                    {
+                        Debug.Log($"[BoothBridge] npm install出力:\n{output}");
+                    }
+                    
+                    if (!string.IsNullOrEmpty(error))
+                    {
+                        Debug.LogWarning($"[BoothBridge] npm install警告:\n{error}");
+                    }
+
+                    if (installProcess.ExitCode == 0)
+                    {
+                        return true;
+                    }
+                    else
+                    {
+                        Debug.LogError($"[BoothBridge] npm install失敗 (終了コード: {installProcess.ExitCode})");
+                        return false;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[BoothBridge] npm install実行エラー: {ex.Message}");
+                return false;
+            }
         }
     }
 }

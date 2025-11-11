@@ -22,6 +22,15 @@ namespace BoothImportAssistant
         private double notificationEndTime = 0;
         private double lastRepaintTime = 0;
         
+        // Bridgeステータスのキャッシュ（OnGUIでの重いチェックを避けるため）
+        private bool cachedIsBridgeRunning = false;
+        private double lastBridgeStatusCheckTime = 0;
+        private const double BRIDGE_STATUS_CHECK_INTERVAL = 10.0; // 10秒ごとにチェック（起動/停止時は即座に更新）
+        
+        // Presenter更新の頻度制限（パフォーマンス向上のため）
+        private double lastPresenterUpdateTime = 0;
+        private const double PRESENTER_UPDATE_INTERVAL = 0.1; // 0.1秒ごとに更新（10FPS相当）
+        
         // タブ関連
         private int selectedTab = 0; // 0: 購入した商品, 1: ギフト
         private string[] tabNames = new string[] { "購入した商品", "ギフト" };
@@ -56,6 +65,10 @@ namespace BoothImportAssistant
             presenter.OnDataChanged += Repaint;
             presenter.OnShowUpdateNotification += ShowUpdateNotificationUI;
 
+            // ウィンドウ起動時にBridgeステータスを即座にチェック
+            cachedIsBridgeRunning = presenter.IsBridgeRunning();
+            lastBridgeStatusCheckTime = EditorApplication.timeSinceStartup;
+
             // エディタ更新ハンドラーを追加
             EditorApplication.update += OnEditorUpdate;
         }
@@ -71,13 +84,26 @@ namespace BoothImportAssistant
 
         private void OnEditorUpdate()
         {
-            // Presenterの更新処理
-            presenter?.Update();
+            double currentTime = EditorApplication.timeSinceStartup;
+            
+            // Presenterの更新処理（頻度を制限してパフォーマンス向上）
+            if (presenter != null && (currentTime - lastPresenterUpdateTime) >= PRESENTER_UPDATE_INTERVAL)
+            {
+                presenter.Update();
+                lastPresenterUpdateTime = currentTime;
+            }
+
+            // Bridgeステータスを定期的にチェック（OnGUIでの重いチェックを避けるため）
+            if (presenter != null && (currentTime - lastBridgeStatusCheckTime) >= BRIDGE_STATUS_CHECK_INTERVAL)
+            {
+                cachedIsBridgeRunning = presenter.IsBridgeRunning();
+                lastBridgeStatusCheckTime = currentTime;
+            }
 
             // Bridgeステータスをリアルタイムで更新（1秒ごと）
-            if (EditorApplication.timeSinceStartup - lastRepaintTime > 1.0)
+            if (currentTime - lastRepaintTime > 1.0)
             {
-                lastRepaintTime = EditorApplication.timeSinceStartup;
+                lastRepaintTime = currentTime;
                 Repaint();
             }
         }
@@ -152,6 +178,9 @@ namespace BoothImportAssistant
             {
                 presenter.SyncWithBooth();
                 currentPage = 0; // ページを最初にリセット
+                // 同期後は即座にキャッシュを更新（Bridgeが起動されるため）
+                cachedIsBridgeRunning = true; // SyncWithBoothは必ずBridgeを起動する
+                lastBridgeStatusCheckTime = EditorApplication.timeSinceStartup;
             }
             
             // 再読み込みボタン
@@ -162,23 +191,24 @@ namespace BoothImportAssistant
                 Repaint();
             }
             
-            // Bridge停止ボタン
-            bool isBridgeRunning = presenter.IsBridgeRunning();
-            GUI.enabled = isBridgeRunning; // Bridgeが起動中のみ有効
+            // Bridge停止ボタン（キャッシュされた値を使用）
+            GUI.enabled = cachedIsBridgeRunning; // Bridgeが起動中のみ有効
             if (GUILayout.Button("Bridge停止", GUILayout.Height(30), GUILayout.Width(100)))
             {
                 presenter.StopBridge();
+                // 停止後は即座にキャッシュを更新
+                cachedIsBridgeRunning = false;
+                lastBridgeStatusCheckTime = EditorApplication.timeSinceStartup;
                 Repaint();
             }
             GUI.enabled = true; // GUI.enabledをリセット
             
             GUILayout.FlexibleSpace();
             
-            // Bridgeステータス
-            bool isRunning = presenter.IsBridgeRunning();
+            // Bridgeステータス（キャッシュされた値を使用）
             GUIStyle statusStyle = new GUIStyle(GUI.skin.label);
-            statusStyle.normal.textColor = isRunning ? Color.green : Color.gray;
-            GUILayout.Label(isRunning ? "● Bridge起動中" : "○ Bridge停止中", statusStyle);
+            statusStyle.normal.textColor = cachedIsBridgeRunning ? Color.green : Color.gray;
+            GUILayout.Label(cachedIsBridgeRunning ? "● Bridge起動中" : "○ Bridge停止中", statusStyle);
             
             EditorGUILayout.EndHorizontal();
             
@@ -471,8 +501,13 @@ namespace BoothImportAssistant
             titleStyle.wordWrap = true;
             
             // タイトルの高さを計算
+            // サムネイル(120) + スペース(10*2) + ボタンエリア(180) + 余裕(50) = 370を引く
             GUIContent titleContent = new GUIContent(asset.title);
-            float titleHeight = titleStyle.CalcHeight(titleContent, EditorGUIUtility.currentViewWidth - 300);
+            float availableWidth = EditorGUIUtility.currentViewWidth - 370;
+            float titleHeight = titleStyle.CalcHeight(titleContent, availableWidth);
+            
+            // 最小高さを確保（改行がない場合でも適切な高さにする）
+            titleHeight = Mathf.Max(titleHeight, EditorGUIUtility.singleLineHeight);
             
             // タイトル領域を取得
             Rect titleRect = EditorGUILayout.GetControlRect(false, titleHeight);

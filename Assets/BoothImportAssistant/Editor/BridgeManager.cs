@@ -16,6 +16,11 @@ namespace BoothImportAssistant
     {
         private static Process bridgeProcess;
         private static string projectPath;
+        
+        // ポートチェックのキャッシュ（パフォーマンス向上のため）
+        private static bool? cachedBridgeRunningStatus = null;
+        private static double lastPortCheckTime = 0;
+        private const double PORT_CHECK_CACHE_DURATION = 10.0; // 10秒間キャッシュ（起動/停止時は即座に更新）
 
         static BridgeManager()
         {
@@ -27,6 +32,9 @@ namespace BoothImportAssistant
         /// </summary>
         public static bool StartBridge()
         {
+            // キャッシュをクリア（起動時に状態が変わるため）
+            cachedBridgeRunningStatus = null;
+            
             // 既存のプロセスが存在する場合、確実に停止してから新しいプロセスを起動
             if (bridgeProcess != null && !bridgeProcess.HasExited)
             {
@@ -141,6 +149,9 @@ namespace BoothImportAssistant
                 }
 
                 Debug.Log("[BoothBridge] Bridge起動成功 (PID: " + bridgeProcess.Id + ")");
+                // 起動成功時はキャッシュを更新
+                cachedBridgeRunningStatus = true;
+                lastPortCheckTime = EditorApplication.timeSinceStartup;
                 return true;
             }
             catch (Exception ex)
@@ -158,6 +169,9 @@ namespace BoothImportAssistant
         /// </summary>
         public static void StopBridge()
         {
+            // キャッシュをクリア（停止時に状態が変わるため）
+            cachedBridgeRunningStatus = null;
+            
             bool stopped = false;
             
             // プロセス参照がある場合、それを停止
@@ -219,15 +233,29 @@ namespace BoothImportAssistant
         /// </summary>
         public static bool IsBridgeRunning()
         {
-            // プロセス参照がある場合、それをチェック
+            // プロセス参照がある場合、それをチェック（これは軽量なので常にチェック）
             if (bridgeProcess != null && !bridgeProcess.HasExited)
             {
+                // プロセス参照がある場合はキャッシュを更新
+                cachedBridgeRunningStatus = true;
+                lastPortCheckTime = EditorApplication.timeSinceStartup;
                 return true;
             }
             
-            // プロセス参照がない場合でも、ポート49729を使用しているプロセスをチェック
-            // （Unity再起動などでプロセス参照が失われた場合に対応）
-            return IsPortInUse(49729);
+            // プロセス参照がない場合、ポートチェックが必要
+            // キャッシュが有効な場合はキャッシュを返す
+            double currentTime = EditorApplication.timeSinceStartup;
+            if (cachedBridgeRunningStatus.HasValue && 
+                (currentTime - lastPortCheckTime) < PORT_CHECK_CACHE_DURATION)
+            {
+                return cachedBridgeRunningStatus.Value;
+            }
+            
+            // キャッシュが無効または存在しない場合、ポートチェックを実行
+            bool isRunning = IsPortInUse(49729);
+            cachedBridgeRunningStatus = isRunning;
+            lastPortCheckTime = currentTime;
+            return isRunning;
         }
         
         /// <summary>

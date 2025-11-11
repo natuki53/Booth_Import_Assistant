@@ -5,7 +5,7 @@
  * ローカルBridgeサーバーへ自動送信します。
  */
 
-const BRIDGE_URL = 'http://localhost:4823/sync';
+const BRIDGE_URL = 'http://localhost:49729/sync';
 const WAIT_TIME = 3000; // DOM読み込み待機時間（ms）
 
 // ログヘルパー関数

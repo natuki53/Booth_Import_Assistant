@@ -27,10 +27,18 @@ namespace BoothImportAssistant
         /// </summary>
         public static bool StartBridge()
         {
+            // 既存のプロセスが存在する場合、確実に停止してから新しいプロセスを起動
             if (bridgeProcess != null && !bridgeProcess.HasExited)
             {
-                return true;
+                Debug.Log("[BoothBridge] 既存のBridgeプロセスを停止してから新しいプロセスを起動します");
+                StopBridge();
             }
+            
+            // プロセス参照が失われていても、ポート49729を使用しているプロセスを検出して終了
+            // （Unity再起動などでプロセス参照が失われた場合に対応）
+            Debug.Log("[BoothBridge] ポート49729を使用している既存のプロセスを確認します");
+            KillProcessUsingPort(49729);
+            System.Threading.Thread.Sleep(500); // プロセス終了を待機
 
             projectPath = GetProjectPath();
             if (string.IsNullOrEmpty(projectPath))
@@ -121,9 +129,13 @@ namespace BoothImportAssistant
 
                 if (bridgeProcess.HasExited)
                 {
-                    Debug.LogError("[BoothBridge] Bridge起動失敗 - Node.js v18+が必要、またはポート4823が使用中");
+                    Debug.LogError("[BoothBridge] Bridge起動失敗 - Node.js v18+が必要、またはポート49729が使用中");
+                    
+                    // ポート49729を使用しているプロセスを検出して終了を試みる
+                    KillProcessUsingPort(49729);
+                    
                     EditorUtility.DisplayDialog("エラー", 
-                        "Bridgeの起動に失敗しました。\n\nUnityコンソールで詳細を確認してください。", 
+                        "Bridgeの起動に失敗しました。\n\nポート49729が使用中の可能性があります。\n既存のBridgeプロセスを終了してから再試行してください。\n\nUnityコンソールで詳細を確認してください。", 
                         "OK");
                     return false;
                 }
@@ -146,18 +158,59 @@ namespace BoothImportAssistant
         /// </summary>
         public static void StopBridge()
         {
+            bool stopped = false;
+            
+            // プロセス参照がある場合、それを停止
             if (bridgeProcess != null && !bridgeProcess.HasExited)
             {
                 try
                 {
+                    Debug.Log("[BoothBridge] Bridge停止中...");
                     bridgeProcess.Kill();
+                    
+                    // プロセスの終了を待機（最大5秒）
+                    // WaitForExit()はプロセスが終了するまで、またはタイムアウトまで待機する
+                    if (!bridgeProcess.WaitForExit(5000))
+                    {
+                        // タイムアウトした場合、HasExitedで最終確認
+                        if (bridgeProcess.HasExited)
+                        {
+                            Debug.Log("[BoothBridge] Bridge停止完了");
+                            stopped = true;
+                        }
+                        else
+                        {
+                            Debug.LogWarning("[BoothBridge] Bridgeプロセスの終了待機がタイムアウトしました。プロセス参照をクリーンアップします。");
+                        }
+                    }
+                    else
+                    {
+                        Debug.Log("[BoothBridge] Bridge停止完了");
+                        stopped = true;
+                    }
+                    
                     bridgeProcess.Dispose();
                     bridgeProcess = null;
                 }
                 catch (Exception ex)
                 {
                     Debug.LogWarning("[BoothBridge] Bridge終了エラー: " + ex.Message);
+                    // エラーが発生してもプロセス参照をクリア
+                    try
+                    {
+                        bridgeProcess?.Dispose();
+                    }
+                    catch { }
+                    bridgeProcess = null;
                 }
+            }
+            
+            // プロセス参照がない場合でも、ポート49729を使用しているプロセスを停止
+            // （Unity再起動などでプロセス参照が失われた場合に対応）
+            if (!stopped)
+            {
+                Debug.Log("[BoothBridge] プロセス参照がないため、ポート49729を使用しているプロセスを検出して停止します");
+                KillProcessUsingPort(49729);
             }
         }
 
@@ -166,7 +219,118 @@ namespace BoothImportAssistant
         /// </summary>
         public static bool IsBridgeRunning()
         {
-            return bridgeProcess != null && !bridgeProcess.HasExited;
+            // プロセス参照がある場合、それをチェック
+            if (bridgeProcess != null && !bridgeProcess.HasExited)
+            {
+                return true;
+            }
+            
+            // プロセス参照がない場合でも、ポート49729を使用しているプロセスをチェック
+            // （Unity再起動などでプロセス参照が失われた場合に対応）
+            return IsPortInUse(49729);
+        }
+        
+        /// <summary>
+        /// 指定されたポートを使用しているプロセスが存在するかチェック
+        /// </summary>
+        private static bool IsPortInUse(int port)
+        {
+            try
+            {
+                if (Application.platform == RuntimePlatform.WindowsEditor)
+                {
+                    // Windows: netstatでポートを使用しているプロセスIDを取得
+                    Process netstatProcess = new Process
+                    {
+                        StartInfo = new ProcessStartInfo
+                        {
+                            FileName = "cmd.exe",
+                            Arguments = "/c netstat -ano | findstr :" + port,
+                            UseShellExecute = false,
+                            RedirectStandardOutput = true,
+                            CreateNoWindow = true
+                        }
+                    };
+                    
+                    netstatProcess.Start();
+                    string output = netstatProcess.StandardOutput.ReadToEnd();
+                    netstatProcess.WaitForExit();
+                    
+                    // 出力からプロセスIDを抽出
+                    string[] lines = output.Split(new char[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+                    foreach (string line in lines)
+                    {
+                        if (line.Contains(":" + port) && line.Contains("LISTENING"))
+                        {
+                            string[] parts = line.Split(new char[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                            if (parts.Length > 0 && int.TryParse(parts[parts.Length - 1], out int pid))
+                            {
+                                try
+                                {
+                                    Process process = Process.GetProcessById(pid);
+                                    if (process.ProcessName.ToLower().Contains("node"))
+                                    {
+                                        return true;
+                                    }
+                                }
+                                catch
+                                {
+                                    // プロセスが存在しない場合は無視
+                                }
+                            }
+                        }
+                    }
+                }
+                else if (Application.platform == RuntimePlatform.OSXEditor || 
+                         Application.platform == RuntimePlatform.LinuxEditor)
+                {
+                    // Mac/Linux: lsofでポートを使用しているプロセスIDを取得
+                    Process lsofProcess = new Process
+                    {
+                        StartInfo = new ProcessStartInfo
+                        {
+                            FileName = "lsof",
+                            Arguments = "-ti:" + port,
+                            UseShellExecute = false,
+                            RedirectStandardOutput = true,
+                            CreateNoWindow = true
+                        }
+                    };
+                    
+                    lsofProcess.Start();
+                    string output = lsofProcess.StandardOutput.ReadToEnd();
+                    lsofProcess.WaitForExit();
+                    
+                    if (!string.IsNullOrWhiteSpace(output))
+                    {
+                        string[] pids = output.Trim().Split('\n');
+                        foreach (string pidStr in pids)
+                        {
+                            if (int.TryParse(pidStr.Trim(), out int pid))
+                            {
+                                try
+                                {
+                                    Process process = Process.GetProcessById(pid);
+                                    if (process.ProcessName.ToLower().Contains("node"))
+                                    {
+                                        return true;
+                                    }
+                                }
+                                catch
+                                {
+                                    // プロセスが存在しない場合は無視
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // エラーが発生した場合はfalseを返す
+            }
+            
+            return false;
         }
 
         private static void OnEditorQuitting()
@@ -492,6 +656,114 @@ namespace BoothImportAssistant
             {
                 Debug.LogError($"[BoothBridge] npm install実行エラー: {ex.Message}");
                 return false;
+            }
+        }
+
+        /// <summary>
+        /// 指定されたポートを使用しているプロセスを検出して終了
+        /// </summary>
+        private static void KillProcessUsingPort(int port)
+        {
+            try
+            {
+                if (Application.platform == RuntimePlatform.WindowsEditor)
+                {
+                    // Windows: netstatでポートを使用しているプロセスIDを取得
+                    // パイプを使うため、cmd経由で実行
+                    Process netstatProcess = new Process
+                    {
+                        StartInfo = new ProcessStartInfo
+                        {
+                            FileName = "cmd.exe",
+                            Arguments = "/c netstat -ano | findstr :" + port,
+                            UseShellExecute = false,
+                            RedirectStandardOutput = true,
+                            CreateNoWindow = true
+                        }
+                    };
+                    
+                    netstatProcess.Start();
+                    string output = netstatProcess.StandardOutput.ReadToEnd();
+                    netstatProcess.WaitForExit();
+                    
+                    // 出力からプロセスIDを抽出
+                    string[] lines = output.Split(new char[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+                    foreach (string line in lines)
+                    {
+                        if (line.Contains(":" + port) && line.Contains("LISTENING"))
+                        {
+                            string[] parts = line.Split(new char[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                            if (parts.Length > 0 && int.TryParse(parts[parts.Length - 1], out int pid))
+                            {
+                                try
+                                {
+                                    Process process = Process.GetProcessById(pid);
+                                    if (process.ProcessName.ToLower().Contains("node"))
+                                    {
+                                        Debug.LogWarning($"[BoothBridge] ポート{port}を使用しているNode.jsプロセス (PID: {pid}) を終了します");
+                                        process.Kill();
+                                        process.WaitForExit(3000);
+                                        Debug.Log($"[BoothBridge] プロセス (PID: {pid}) を終了しました");
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    Debug.LogWarning($"[BoothBridge] プロセス (PID: {pid}) の終了に失敗: {ex.Message}");
+                                }
+                            }
+                        }
+                    }
+                }
+                else if (Application.platform == RuntimePlatform.OSXEditor || 
+                         Application.platform == RuntimePlatform.LinuxEditor)
+                {
+                    // Mac/Linux: lsofでポートを使用しているプロセスIDを取得
+                    Process lsofProcess = new Process
+                    {
+                        StartInfo = new ProcessStartInfo
+                        {
+                            FileName = "lsof",
+                            Arguments = "-ti:" + port,
+                            UseShellExecute = false,
+                            RedirectStandardOutput = true,
+                            CreateNoWindow = true
+                        }
+                    };
+                    
+                    lsofProcess.Start();
+                    string output = lsofProcess.StandardOutput.ReadToEnd();
+                    lsofProcess.WaitForExit();
+                    
+                    if (!string.IsNullOrWhiteSpace(output))
+                    {
+                        string[] pids = output.Trim().Split('\n');
+                        foreach (string pidStr in pids)
+                        {
+                            if (int.TryParse(pidStr.Trim(), out int pid))
+                            {
+                                try
+                                {
+                                    Process process = Process.GetProcessById(pid);
+                                    if (process.ProcessName.ToLower().Contains("node"))
+                                    {
+                                        Debug.LogWarning($"[BoothBridge] ポート{port}を使用しているNode.jsプロセス (PID: {pid}) を終了します");
+                                        process.Kill();
+                                        process.WaitForExit(3000);
+                                        Debug.Log($"[BoothBridge] プロセス (PID: {pid}) を終了しました");
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    Debug.LogWarning($"[BoothBridge] プロセス (PID: {pid}) の終了に失敗: {ex.Message}");
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[BoothBridge] ポート{port}を使用しているプロセスの検出に失敗: {ex.Message}");
             }
         }
     }

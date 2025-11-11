@@ -4,7 +4,7 @@
  * ダウンロード監視と自動処理
  */
 
-const BRIDGE_URL = 'http://localhost:4823';
+const BRIDGE_URL = 'http://localhost:49729';
 
 // ログヘルパー関数
 function logInfo(...args) {

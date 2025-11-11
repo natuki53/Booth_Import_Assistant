@@ -11,7 +11,7 @@ namespace BoothImportAssistant.Services
     /// </summary>
     public class BridgeService
     {
-        private const string BRIDGE_URL = "http://localhost:4823";
+        private const string BRIDGE_URL = "http://localhost:49729";
         private ProgressInfo currentProgress;
         private bool isCheckingProgress = false;
 

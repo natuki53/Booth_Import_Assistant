@@ -34,7 +34,7 @@ node bridge.js --projectPath "C:/Path/To/UnityProject"
 
 ## 設定
 
-- **ポート**: 4823（固定）
+- **ポート**: 49729（固定）
 - **バインド**: localhost のみ
 - **監視フォルダ**: `%USERPROFILE%/Downloads`
 

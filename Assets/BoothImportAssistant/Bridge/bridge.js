@@ -676,7 +676,7 @@ function watchDownloadsFolder() {
 }
 
 // HTTPサーバー
-const PORT = 4823;
+const PORT = 49729;
 const server = http.createServer(async (req, res) => {
   // CORS設定（localhostのみ）
   res.setHeader('Access-Control-Allow-Origin', '*');

@@ -154,7 +154,7 @@ VRChatアバター開発者向けの効率化ツールです。
 - **Unity Editor拡張**: C#
 - **Bridge サーバー**: Node.js v20
 - **ブラウザ拡張**: JavaScript (Manifest V3)
-- **通信**: HTTP (localhost:4823)
+- **通信**: HTTP (localhost:49729)
 - **データ形式**: JSON
 
 ---

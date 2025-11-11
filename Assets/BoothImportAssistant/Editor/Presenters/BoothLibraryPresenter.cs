@@ -166,7 +166,7 @@ namespace BoothImportAssistant.Presenters
             if (bridge.IsBridgeRunning())
             {
                 bridge.StopBridge();
-                System.Threading.Thread.Sleep(500);
+                // StopBridge()内でWaitForExit()を呼んでいるため、追加の待機は不要
             }
 
             bool started = bridge.StartBridge();

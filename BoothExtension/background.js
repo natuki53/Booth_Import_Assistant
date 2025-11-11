@@ -98,8 +98,18 @@ chrome.downloads.onChanged.addListener(async (delta) => {
     
     if (delta.state && delta.state.current === 'complete') {
       logInfo('ダウンロード完了:', tracking.boothId || tracking.downloadId);
-      await notifyBridgeDownload(tracking);
-      downloadTracking.delete(delta.id);
+      
+      // chrome.downloads.search()で完全なファイルパスを取得
+      chrome.downloads.search({ id: delta.id }, async (items) => {
+        if (items && items.length > 0) {
+          const downloadItem = items[0];
+          tracking.fullPath = downloadItem.filename; // 完全なファイルパス
+          logInfo('完全なファイルパス取得:', tracking.fullPath);
+        }
+        
+        await notifyBridgeDownload(tracking);
+        downloadTracking.delete(delta.id);
+      });
     }
     
     if (delta.state && delta.state.current === 'interrupted') {
@@ -123,11 +133,14 @@ async function notifyBridgeDownload(tracking) {
     const filename = tracking.filename.split(/[/\\]/).pop();
     const notifyData = {
       filename: filename,
+      fullPath: tracking.fullPath || tracking.filename, // 完全なファイルパスを追加
       downloadId: tracking.downloadId,
       boothId: tracking.boothId,
       url: tracking.url,
       timestamp: Date.now()
     };
+    
+    logInfo('Bridge通知データ:', notifyData);
     
     const response = await fetch(`${BRIDGE_URL}/download-notify`, {
       method: 'POST',

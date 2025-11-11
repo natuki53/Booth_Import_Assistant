@@ -817,7 +817,7 @@ const server = http.createServer(async (req, res) => {
       body += chunk.toString();
     });
     
-    req.on('end', () => {
+    req.on('end', async () => {
       try {
         const data = JSON.parse(body);
         logInfo('✓ ダウンロード通知受信');
@@ -829,14 +829,41 @@ const server = http.createServer(async (req, res) => {
             boothId: data.boothId,
             downloadId: data.downloadId,
             url: data.url,
+            fullPath: data.fullPath, // 完全なファイルパスを保存
             timestamp: data.timestamp || Date.now()
           });
           
           logInfo('✓ ダウンロード追跡登録完了');
           logInfo(`  ファイル名: ${data.filename}`);
           logInfo(`  商品ID: ${data.boothId || data.downloadId}`);
+          if (data.fullPath) {
+            logInfo(`  完全なパス: ${data.fullPath}`);
+          }
           logDebug(`  URL: ${data.url}`);
           logDebug(`  追跡マップサイズ: ${downloadTrackingMap.size}`);
+          
+          // ZIPファイルの場合、完全なパスがあれば即座に処理
+          if (data.fullPath && data.filename.toLowerCase().endsWith('.zip') && fs.existsSync(data.fullPath)) {
+            logInfo('=== ダウンロード完了ファイルを即座に処理 ===');
+            logInfo('ZIPファイル:', data.fullPath);
+            
+            // 1秒待機してファイルの書き込み完了を確認
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // ファイルが存在し、サイズが0より大きいことを確認
+            if (fs.existsSync(data.fullPath)) {
+              const zipStats = fs.statSync(data.fullPath);
+              if (zipStats.size > 0) {
+                logInfo(`ファイルサイズ: ${(zipStats.size / 1024 / 1024).toFixed(2)} MB`);
+                logInfo('ZIP展開を開始します');
+                await extractAndImportZip(data.fullPath, data.filename);
+              } else {
+                logWarn('⚠️ ファイルサイズが0です。書き込み完了を待機します。');
+              }
+            } else {
+              logWarn('⚠️ ファイルが見つかりません:', data.fullPath);
+            }
+          }
           
           // 古いエントリを削除（1時間以上前）
           const oneHourAgo = Date.now() - 60 * 60 * 1000;

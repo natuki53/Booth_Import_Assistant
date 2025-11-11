@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "BOOTH Import Assistant",
-  "version": "0.1.2",
+  "version": "1.0.0",
   "description": "BOOTH購入リストをUnityに同期するための拡張機能",
   "icons": {
     "16": "icon16.png",

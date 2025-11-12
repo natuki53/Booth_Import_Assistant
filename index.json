@@ -1,7 +1,7 @@
 {
   "name": "natuki's VPM",
   "author": "natuki",
-  "url": "https://natuki53.github.io/Booth_Import_Assistant/",
+  "url": "https://natuki53.github.io/Booth_Import_Assistant/index.json",
   "id": "com.natuki.booth-import-assistant.repo",
   "packages": {
     "com.natuki.booth-import-assistant": {

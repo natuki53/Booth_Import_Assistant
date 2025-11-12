@@ -517,7 +517,7 @@ namespace BoothImportAssistant
                     bridgeManagerPath = bridgeManagerPath.Replace('\\', '/');
                     
                     // アセットパスをファイルシステムパスに変換
-                    string fullPath;
+                    string fullPath = null;
                     if (bridgeManagerPath.StartsWith("Assets/"))
                     {
                         fullPath = Path.GetFullPath(bridgeManagerPath.Replace("Assets/", Application.dataPath + "/"));
@@ -531,6 +531,12 @@ namespace BoothImportAssistant
                     else
                     {
                         fullPath = Path.GetFullPath(bridgeManagerPath);
+                    }
+                    
+                    // fullPathが取得できなかった場合はスキップ
+                    if (string.IsNullOrEmpty(fullPath))
+                    {
+                        continue;
                     }
                     
                     // パスを正規化

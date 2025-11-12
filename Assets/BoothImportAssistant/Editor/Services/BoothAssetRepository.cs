@@ -70,8 +70,8 @@ namespace BoothImportAssistant.Services
 
                 if (wrapper?.items != null)
                 {
-                    // タイトルでソート
-                    assets = wrapper.items.OrderBy(a => a.title).ToList();
+                    // JSONの記載順を維持（BOOTHの取得順）
+                    assets = wrapper.items.ToList();
                     OnAssetsChanged?.Invoke();
                     return true;
                 }

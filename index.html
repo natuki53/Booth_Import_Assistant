@@ -16,7 +16,7 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
             line-height: 1.6;
             color: #333;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(180deg, #ffb3d9 0%, #ffe6f2 50%, #fff5f9 100%);
             min-height: 100vh;
         }
 
@@ -35,14 +35,14 @@
         .logo {
             font-size: 3rem;
             font-weight: bold;
-            color: white;
+            color: #2d3748;
             margin-bottom: 10px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+            text-shadow: 1px 1px 2px rgba(255,255,255,0.8);
         }
 
         .tagline {
             font-size: 1.5rem;
-            color: rgba(255,255,255,0.9);
+            color: #4a5568;
             margin-bottom: 40px;
         }
 
@@ -87,24 +87,24 @@
         }
 
         .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #ff6b9d 0%, #ff8fab 100%);
             color: white;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 4px 15px rgba(255, 107, 157, 0.4);
         }
 
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+            box-shadow: 0 6px 20px rgba(255, 107, 157, 0.6);
         }
 
         .btn-secondary {
             background: white;
-            color: #667eea;
-            border: 2px solid #667eea;
+            color: #ff6b9d;
+            border: 2px solid #ff6b9d;
         }
 
         .btn-secondary:hover {
-            background: #667eea;
+            background: #ff6b9d;
             color: white;
         }
 
@@ -149,11 +149,11 @@
         footer {
             text-align: center;
             padding: 40px 0;
-            color: rgba(255,255,255,0.8);
+            color: #4a5568;
         }
 
         footer a {
-            color: white;
+            color: #ff6b9d;
             text-decoration: none;
             margin: 0 15px;
             transition: opacity 0.3s;
@@ -161,6 +161,7 @@
 
         footer a:hover {
             opacity: 0.7;
+            text-decoration: underline;
         }
 
         /* Responsive */
@@ -205,6 +206,9 @@
                 <div class="cta-buttons">
                     <a href="vcc://vpm/addRepo?url=https://natuki53.github.io/Booth_Import_Assistant/index.json" class="btn btn-primary">
                         VCCに追加
+                    </a>
+                    <a href="https://chromewebstore.google.com/detail/melbffodmbnmadeobmdeaomafkadlokd?utm_source=item-share-cb" class="btn btn-primary" target="_blank">
+                        ブラウザ拡張
                     </a>
                     <a href="https://github.com/natuki53/Booth_Import_Assistant" class="btn btn-secondary" target="_blank">
                         GitHub

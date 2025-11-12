@@ -14,9 +14,11 @@ namespace BoothImportAssistant.Services
     {
         private readonly string jsonFilePath;
         private List<BoothAsset> assets = new List<BoothAsset>();
+        private DateTime? lastUpdated = null;
 
         public event Action OnAssetsChanged;
         public IReadOnlyList<BoothAsset> Assets => assets.AsReadOnly();
+        public DateTime? LastUpdated => lastUpdated;
 
         public BoothAssetRepository(string projectPath)
         {
@@ -60,11 +62,15 @@ namespace BoothImportAssistant.Services
 
             if (!File.Exists(jsonFilePath))
             {
+                lastUpdated = null;
                 return false;
             }
 
             try
             {
+                // JSONファイルの最終更新日時を記録
+                lastUpdated = File.GetLastWriteTime(jsonFilePath);
+                
                 string json = File.ReadAllText(jsonFilePath);
                 var wrapper = JsonUtility.FromJson<BoothAssetListWrapper>("{\"items\":" + json + "}");
 

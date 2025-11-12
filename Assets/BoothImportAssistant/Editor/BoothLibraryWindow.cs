@@ -20,6 +20,10 @@ namespace BoothImportAssistant
         
         private bool showUpdateNotification = false;
         private double notificationEndTime = 0;
+        private bool showReloadNotification = false;
+        private string reloadNotificationMessage = "";
+        private MessageType reloadNotificationMessageType = MessageType.Info;
+        private double reloadNotificationEndTime = 0;
         private double lastRepaintTime = 0;
         
         // Bridgeステータスのキャッシュ（OnGUIでの重いチェックを避けるため）
@@ -111,7 +115,7 @@ namespace BoothImportAssistant
         private void ShowUpdateNotificationUI()
         {
             showUpdateNotification = true;
-            notificationEndTime = EditorApplication.timeSinceStartup + 2.0;
+            notificationEndTime = EditorApplication.timeSinceStartup + 5.0;
         }
 
         private void OnGUI()
@@ -127,18 +131,28 @@ namespace BoothImportAssistant
             // ヘッダー
             DrawHeader();
             
-            // タブUI
-            DrawTabs();
-
-            // 更新通知
+            // 更新通知（同期ボタンの下に表示）
             if (showUpdateNotification && EditorApplication.timeSinceStartup < notificationEndTime)
             {
-                EditorGUILayout.HelpBox("✅ BOOTHデータが更新されました！", MessageType.Info);
+                EditorGUILayout.HelpBox("BOOTHデータを更新しました。", MessageType.Info);
             }
             else if (showUpdateNotification)
             {
                 showUpdateNotification = false;
             }
+            
+            // 再読み込み通知
+            if (showReloadNotification && EditorApplication.timeSinceStartup < reloadNotificationEndTime)
+            {
+                EditorGUILayout.HelpBox(reloadNotificationMessage, reloadNotificationMessageType);
+            }
+            else if (showReloadNotification)
+            {
+                showReloadNotification = false;
+            }
+            
+            // タブUI
+            DrawTabs();
 
             // 進捗バー表示
             var currentProgress = presenter.CurrentProgress;
@@ -186,7 +200,19 @@ namespace BoothImportAssistant
             // 再読み込みボタン
             if (GUILayout.Button("再読み込み", GUILayout.Height(30), GUILayout.Width(100)))
             {
-                presenter.ReloadAssets();
+                bool success = presenter.ReloadAssets();
+                showReloadNotification = true;
+                if (success)
+                {
+                    reloadNotificationMessage = "BOOTHデータを再読み込みをしました。";
+                    reloadNotificationMessageType = MessageType.Info;
+                }
+                else
+                {
+                    reloadNotificationMessage = "BOOTHデータが見つかりません。同期を行ってください。";
+                    reloadNotificationMessageType = MessageType.Warning;
+                }
+                reloadNotificationEndTime = EditorApplication.timeSinceStartup + 5.0;
                 currentPage = 0; // ページを最初にリセット
                 Repaint();
             }
@@ -211,6 +237,16 @@ namespace BoothImportAssistant
             GUILayout.Label(cachedIsBridgeRunning ? "● Bridge起動中" : "○ Bridge停止中", statusStyle);
             
             EditorGUILayout.EndHorizontal();
+            
+            // 最終更新日時の表示（同期ボタンの下）
+            if (presenter.LastUpdated.HasValue)
+            {
+                EditorGUILayout.Space(3);
+                GUIStyle dateStyle = new GUIStyle(EditorStyles.miniLabel);
+                dateStyle.normal.textColor = Color.gray;
+                string dateText = $"最終更新: {presenter.LastUpdated.Value:yyyy/MM/dd HH:mm:ss}";
+                EditorGUILayout.LabelField(dateText, dateStyle);
+            }
             
             EditorGUILayout.Space(5);
             EditorGUILayout.LabelField("", GUI.skin.horizontalSlider);

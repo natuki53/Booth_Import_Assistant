@@ -25,15 +25,13 @@ namespace BoothImportAssistant.Presenters
         // 複数ダウンロード用の選択状態
         private Dictionary<string, int> selectedDownloadIndex = new Dictionary<string, int>();
 
-        // 遅延再読み込み用
-        private double jsonChangeTime = 0;
-
         // イベント
         public event Action OnDataChanged;
         public event Action OnShowUpdateNotification;
 
         public IReadOnlyList<BoothAsset> Assets => repository.Assets;
         public ProgressInfo CurrentProgress => bridge.CurrentProgress;
+        public DateTime? LastUpdated => repository.LastUpdated;
 
         public BoothLibraryPresenter(string projectPath)
         {
@@ -48,7 +46,6 @@ namespace BoothImportAssistant.Presenters
 
             // イベント接続
             repository.OnAssetsChanged += () => OnDataChanged?.Invoke();
-            
             fileWatcher.OnJsonFileChanged += HandleJsonFileChanged;
             fileWatcher.OnPackageFileCreated += HandlePackageDetected;
             
@@ -71,8 +68,11 @@ namespace BoothImportAssistant.Presenters
 
         private void HandleJsonFileChanged()
         {
-            // デバウンス（200ms後に再読み込み）
-            jsonChangeTime = EditorApplication.timeSinceStartup + 0.2;
+            bool loaded = repository.LoadAssets();
+            if (loaded)
+            {
+                OnShowUpdateNotification?.Invoke();
+            }
         }
 
         private void HandlePackageDetected(string packagePath)
@@ -82,14 +82,6 @@ namespace BoothImportAssistant.Presenters
 
         public void Update()
         {
-            // JSON変更チェック
-            if (jsonChangeTime > 0 && EditorApplication.timeSinceStartup >= jsonChangeTime)
-            {
-                jsonChangeTime = 0;
-                repository.LoadAssets();
-                OnShowUpdateNotification?.Invoke();
-            }
-
             // 進捗チェック
             bridge.CheckProgressAsync();
 
@@ -186,10 +178,11 @@ namespace BoothImportAssistant.Presenters
                 "OK");
         }
 
-        public void ReloadAssets()
+        public bool ReloadAssets()
         {
-            repository.LoadAssets();
+            bool loaded = repository.LoadAssets();
             thumbnailCache.Clear();
+            return loaded;
         }
 
         public void StopBridge()

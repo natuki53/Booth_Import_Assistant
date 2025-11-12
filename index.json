@@ -109,6 +109,32 @@
           "vpmDependencies": {},
           "legacyFolders": {},
           "legacyFiles": {}
+        },
+        "1.0.2": {
+          "name": "com.natuki.booth-import-assistant",
+          "displayName": "BOOTH Import Assistant",
+          "version": "1.0.2",
+          "unity": "2022.3",
+          "description": "BOOTHライブラリから直接Unityプロジェクトにアセットをインポートするツール。",
+          "author": {
+            "name": "natuki",
+            "email": "hiiraginatuki53@gmail.com",
+            "url": "https://github.com/natuki53"
+          },
+          "url": "https://github.com/natuki53/Booth_Import_Assistant/releases/download/v1.0.2/com.natuki.booth-import-assistant-1.0.2.zip",
+          "repo": "https://github.com/natuki53/Booth_Import_Assistant",
+          "zipSHA256": "223EC8B995A484A602F9573A75DA15D9E63B0321A8D53A8C9EF6177A2F0605E8",
+          "keywords": [
+            "BOOTH",
+            "VRChat",
+            "Import",
+            "Asset Management",
+            "アバター",
+            "衣装"
+          ],
+          "vpmDependencies": {},
+          "legacyFolders": {},
+          "legacyFiles": {}
         }
       }
     }

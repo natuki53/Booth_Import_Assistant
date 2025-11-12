@@ -1,7 +1,7 @@
 {
   "name": "com.natuki.booth-import-assistant",
   "displayName": "BOOTH Import Assistant",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "unity": "2022.3",
   "description": "BOOTHライブラリから直接Unityプロジェクトにアセットをインポートするツール。",
   "keywords": [

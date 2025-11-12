@@ -165,8 +165,6 @@ function extractBoothItemsFromDOM(doc, processedIds = new Set(), source = 'purch
           return 0;
         });
         
-        const purchaseDate = new Date().toISOString().split('T')[0];
-        
         const item = {
           id: boothId,
           title: title,
@@ -174,7 +172,6 @@ function extractBoothItemsFromDOM(doc, processedIds = new Set(), source = 'purch
           productUrl: productLink.href,
           thumbnailUrl: thumbnailUrl,
           downloadUrls: downloadUrls,
-          purchaseDate: purchaseDate,
           localThumbnail: `BoothBridge/thumbnails/${boothId}.jpg`,
           installed: false,
           importPath: `Assets/ImportedAssets/${boothId}/`,

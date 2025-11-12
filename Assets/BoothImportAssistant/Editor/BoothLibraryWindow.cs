@@ -329,9 +329,6 @@ namespace BoothImportAssistant
             authorStyle.wordWrap = true;
             GUILayout.Label("作者: " + asset.author, authorStyle);
             
-            // 購入日
-            GUILayout.Label("購入日: " + asset.purchaseDate, EditorStyles.miniLabel);
-            
             if (asset.installed)
             {
                 GUILayout.Label("✅ インポート済み", EditorStyles.miniLabel);

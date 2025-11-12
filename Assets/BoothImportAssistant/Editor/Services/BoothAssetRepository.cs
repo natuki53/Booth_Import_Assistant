@@ -70,7 +70,8 @@ namespace BoothImportAssistant.Services
 
                 if (wrapper?.items != null)
                 {
-                    assets = wrapper.items.OrderByDescending(a => a.purchaseDate).ToList();
+                    // タイトルでソート
+                    assets = wrapper.items.OrderBy(a => a.title).ToList();
                     OnAssetsChanged?.Invoke();
                     return true;
                 }

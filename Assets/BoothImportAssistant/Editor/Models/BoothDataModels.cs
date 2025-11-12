@@ -39,7 +39,6 @@ namespace BoothImportAssistant.Models
         public string productUrl;
         public string thumbnailUrl;
         public DownloadUrl[] downloadUrls; // 複数ダウンロードリンク対応
-        public string purchaseDate;
         public string localThumbnail;
         public bool installed;
         public string importPath;

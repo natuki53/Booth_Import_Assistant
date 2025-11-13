@@ -21,9 +21,7 @@
   "repo": "https://github.com/natuki53/Booth_Import_Assistant.git",
   "license": "MIT",
   "vpmDependencies": {},
-  "legacyFolders": {
-    "Assets/BoothImportAssistant": ""
-  },
+  "legacyFolders": {},
   "legacyFiles": {}
 }
 

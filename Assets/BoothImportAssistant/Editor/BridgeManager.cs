@@ -77,6 +77,10 @@ namespace BoothImportAssistant
 
             // node_modulesが存在しない場合、npm installを実行
             string bridgeFolder = Path.GetDirectoryName(bridgeScriptPath);
+            if (!string.IsNullOrEmpty(bridgeFolder))
+            {
+                bridgeFolder = bridgeFolder.Replace('\\', '/');
+            }
             string nodeModulesPath = Path.Combine(bridgeFolder, "node_modules");
             string packageJsonPath = Path.Combine(bridgeFolder, "package.json");
             
@@ -454,6 +458,10 @@ namespace BoothImportAssistant
             }
             
             string bridgeFolder = Path.GetDirectoryName(bridgeScriptPath);
+            if (!string.IsNullOrEmpty(bridgeFolder))
+            {
+                bridgeFolder = bridgeFolder.Replace('\\', '/');
+            }
             string runtimeFolder = Path.Combine(bridgeFolder, "node-runtime");
             
             #if UNITY_EDITOR_WIN
@@ -526,6 +534,10 @@ namespace BoothImportAssistant
                     {
                         // Packages/はプロジェクトルートからの相対パス
                         string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+                        if (!string.IsNullOrEmpty(projectRoot))
+                        {
+                            projectRoot = projectRoot.Replace('\\', '/');
+                        }
                         fullPath = Path.GetFullPath(Path.Combine(projectRoot, bridgeManagerPath));
                     }
                     else
@@ -542,7 +554,15 @@ namespace BoothImportAssistant
                     // パスを正規化
                     fullPath = fullPath.Replace('\\', '/');
                     string editorFolder = Path.GetDirectoryName(fullPath);
+                    if (!string.IsNullOrEmpty(editorFolder))
+                    {
+                        editorFolder = editorFolder.Replace('\\', '/');
+                    }
                     string boothImportAssistantFolder = Directory.GetParent(editorFolder).FullName;
+                    if (!string.IsNullOrEmpty(boothImportAssistantFolder))
+                    {
+                        boothImportAssistantFolder = boothImportAssistantFolder.Replace('\\', '/');
+                    }
                     string bridgePath = Path.Combine(boothImportAssistantFolder, "Bridge", "bridge.js");
                     
                     // パスを正規化（バックスラッシュをスラッシュに変換）
@@ -559,7 +579,15 @@ namespace BoothImportAssistant
                     // パスを正規化（バックスラッシュをスラッシュに変換）
                     scriptPath = scriptPath.Replace('\\', '/');
                     string editorFolder = Path.GetDirectoryName(scriptPath);
+                    if (!string.IsNullOrEmpty(editorFolder))
+                    {
+                        editorFolder = editorFolder.Replace('\\', '/');
+                    }
                     string boothImportAssistantFolder = Directory.GetParent(editorFolder).FullName;
+                    if (!string.IsNullOrEmpty(boothImportAssistantFolder))
+                    {
+                        boothImportAssistantFolder = boothImportAssistantFolder.Replace('\\', '/');
+                    }
                     string bridgePath = Path.Combine(boothImportAssistantFolder, "Bridge", "bridge.js");
                     
                     // パスを正規化
@@ -578,12 +606,108 @@ namespace BoothImportAssistant
         }
 
         /// <summary>
+        /// システムのnpmパスを検索
+        /// </summary>
+        private static string FindSystemNpmPath()
+        {
+            if (Application.platform == RuntimePlatform.WindowsEditor)
+            {
+                // Windows: 環境変数PATHからnpm.cmdを検索
+                string pathEnv = Environment.GetEnvironmentVariable("PATH");
+                if (!string.IsNullOrEmpty(pathEnv))
+                {
+                    string[] paths = pathEnv.Split(';');
+                    foreach (string path in paths)
+                    {
+                        if (string.IsNullOrEmpty(path)) continue;
+                        string npmPath = Path.Combine(path, "npm.cmd");
+                        if (File.Exists(npmPath))
+                        {
+                            return npmPath;
+                        }
+                    }
+                }
+                
+                // 一般的なインストール場所
+                string programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+                if (!string.IsNullOrEmpty(programFiles))
+                {
+                    string npmPath1 = Path.Combine(programFiles, "nodejs", "npm.cmd");
+                    if (File.Exists(npmPath1)) return npmPath1;
+                }
+                
+                return "npm.cmd";
+            }
+            else if (Application.platform == RuntimePlatform.OSXEditor || 
+                     Application.platform == RuntimePlatform.LinuxEditor)
+            {
+                // Mac/Linux: 一般的なインストール場所を確認
+                string[] commonPaths = new string[]
+                {
+                    "/usr/local/bin/npm",           // Homebrew (Intel Mac)
+                    "/opt/homebrew/bin/npm",        // Homebrew (Apple Silicon)
+                    "/usr/bin/npm",                 // システムインストール
+                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Personal), ".nvm/versions/node/*/bin/npm")
+                };
+                
+                foreach (string npmPath in commonPaths)
+                {
+                    // ワイルドカード対応（nvm用）
+                    if (npmPath.Contains("*"))
+                    {
+                        string baseDir = Path.GetDirectoryName(Path.GetDirectoryName(npmPath));
+                        if (Directory.Exists(baseDir))
+                        {
+                            var dirs = Directory.GetDirectories(baseDir);
+                            foreach (var dir in dirs)
+                            {
+                                string fullPath = Path.Combine(dir, "bin", "npm");
+                                if (File.Exists(fullPath))
+                                {
+                                    return fullPath;
+                                }
+                            }
+                        }
+                    }
+                    else if (File.Exists(npmPath))
+                    {
+                        return npmPath;
+                    }
+                }
+                
+                // 環境変数PATHから検索
+                string pathEnv = Environment.GetEnvironmentVariable("PATH");
+                if (!string.IsNullOrEmpty(pathEnv))
+                {
+                    string[] paths = pathEnv.Split(':');
+                    foreach (string path in paths)
+                    {
+                        if (string.IsNullOrEmpty(path)) continue;
+                        string npmPath = Path.Combine(path, "npm");
+                        if (File.Exists(npmPath))
+                        {
+                            return npmPath;
+                        }
+                    }
+                }
+                
+                return "npm";
+            }
+            
+            return "npm";
+        }
+
+        /// <summary>
         /// node_modulesをインストール
         /// </summary>
         private static bool InstallNodeModules(string nodePath, string workingDirectory)
         {
             try
             {
+                // バンドルされたNode.jsを使用しているかどうかを判定
+                bool isBundledNode = !string.IsNullOrEmpty(nodePath) && 
+                                     nodePath.Replace('\\', '/').Contains("node-runtime");
+                
                 // npmコマンドのパスを取得
                 string npmPath;
                 string nodeDir = Path.GetDirectoryName(nodePath);
@@ -595,7 +719,7 @@ namespace BoothImportAssistant
                     if (!File.Exists(npmPath))
                     {
                         // npm.cmdが見つからない場合、システムのnpmを使用
-                        npmPath = "npm.cmd";
+                        npmPath = FindSystemNpmPath();
                     }
                 }
                 else
@@ -604,49 +728,236 @@ namespace BoothImportAssistant
                     npmPath = Path.Combine(nodeDir, "npm");
                     if (!File.Exists(npmPath))
                     {
-                        // システムのnpmを使用
-                        npmPath = "npm";
+                        // バンドルされたNode.jsを使用している場合、システムのnpmのフルパスを検索
+                        if (isBundledNode)
+                        {
+                            npmPath = FindSystemNpmPath();
+                        }
+                        else
+                        {
+                            // システムのnpmを使用
+                            npmPath = "npm";
+                        }
                     }
                 }
 
-                ProcessStartInfo installInfo = new ProcessStartInfo
+                // バンドルされたNode.jsを使用している場合、シェル経由で実行
+                // これにより環境変数PATHが正しく設定される
+                if (isBundledNode)
                 {
-                    FileName = npmPath,
-                    Arguments = "install",
-                    WorkingDirectory = workingDirectory,
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    StandardOutputEncoding = Encoding.UTF8,
-                    StandardErrorEncoding = Encoding.UTF8
-                };
+                    string nodePathForNpm = null;
+                    
+                    if (Application.platform == RuntimePlatform.WindowsEditor)
+                    {
+                        // Windows: npmと同じディレクトリにnode.exeがある可能性が高い
+                        if (!string.IsNullOrEmpty(npmPath) && File.Exists(npmPath))
+                        {
+                            string npmDir = Path.GetDirectoryName(npmPath);
+                            if (File.Exists(Path.Combine(npmDir, "node.exe")))
+                            {
+                                nodePathForNpm = npmDir;
+                            }
+                        }
+                        
+                        // 一般的なnodeのインストール場所を確認
+                        if (string.IsNullOrEmpty(nodePathForNpm))
+                        {
+                            string programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+                            if (!string.IsNullOrEmpty(programFiles))
+                            {
+                                string nodePath1 = Path.Combine(programFiles, "nodejs", "node.exe");
+                                if (File.Exists(nodePath1))
+                                {
+                                    nodePathForNpm = Path.Combine(programFiles, "nodejs");
+                                }
+                            }
+                        }
+                        
+                        // cmd経由でnpmを実行（nodeのパスをPATHに追加）
+                        string pathPrefix = !string.IsNullOrEmpty(nodePathForNpm) 
+                            ? $"set PATH={nodePathForNpm};%PATH% && " 
+                            : "";
+                        
+                        string cmdCommand = $"{pathPrefix}cd /d \"{workingDirectory}\" && \"{npmPath}\" install";
+                        
+                        ProcessStartInfo installInfo = new ProcessStartInfo
+                        {
+                            FileName = "cmd.exe",
+                            Arguments = $"/c \"{cmdCommand}\"",
+                            UseShellExecute = false,
+                            CreateNoWindow = true,
+                            RedirectStandardOutput = true,
+                            RedirectStandardError = true,
+                            StandardOutputEncoding = Encoding.UTF8,
+                            StandardErrorEncoding = Encoding.UTF8
+                        };
+                        
+                        using (Process installProcess = Process.Start(installInfo))
+                        {
+                            if (installProcess == null)
+                            {
+                                return false;
+                            }
+
+                            string output = installProcess.StandardOutput.ReadToEnd();
+                            string error = installProcess.StandardError.ReadToEnd();
+                            
+                            installProcess.WaitForExit();
+
+                            if (installProcess.ExitCode == 0)
+                            {
+                                return true;
+                            }
+                            else
+                            {
+                                Debug.LogError($"[BoothBridge] npm install失敗 (終了コード: {installProcess.ExitCode})");
+                                if (!string.IsNullOrEmpty(error))
+                                {
+                                    Debug.LogError($"[BoothBridge] エラー: {error}");
+                                }
+                                if (!string.IsNullOrEmpty(output))
+                                {
+                                    Debug.LogError($"[BoothBridge] 出力: {output}");
+                                }
+                                return false;
+                            }
+                        }
+                    }
+                    else if (Application.platform == RuntimePlatform.OSXEditor || 
+                             Application.platform == RuntimePlatform.LinuxEditor)
+                    {
+                        // Mac/Linux: npmと同じディレクトリにnodeがある可能性が高い
+                        if (!string.IsNullOrEmpty(npmPath) && File.Exists(npmPath))
+                        {
+                            string npmDir = Path.GetDirectoryName(npmPath);
+                            if (File.Exists(Path.Combine(npmDir, "node")))
+                            {
+                                nodePathForNpm = npmDir;
+                            }
+                        }
+                        
+                        // 一般的なnodeのインストール場所を確認
+                        if (string.IsNullOrEmpty(nodePathForNpm))
+                        {
+                            string[] commonNodePaths = new string[]
+                            {
+                                "/opt/homebrew/bin/node",        // Homebrew (Apple Silicon)
+                                "/usr/local/bin/node",           // Homebrew (Intel Mac)
+                                "/usr/bin/node"                  // システムインストール
+                            };
+                            
+                            foreach (string commonNodePath in commonNodePaths)
+                            {
+                                if (File.Exists(commonNodePath))
+                                {
+                                    nodePathForNpm = Path.GetDirectoryName(commonNodePath);
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        // シェルコマンドを構築
+                        string pathPrefix = !string.IsNullOrEmpty(nodePathForNpm) 
+                            ? $"export PATH='{nodePathForNpm}:$PATH' && " 
+                            : "";
+                        
+                        string escapedWorkingDir = workingDirectory.Replace("'", "'\"'\"'");
+                        string escapedNpmPath = (npmPath != "npm" && File.Exists(npmPath))
+                            ? npmPath.Replace("'", "'\"'\"'")
+                            : "npm";
+                        
+                        string shellCommand = $"{pathPrefix}cd '{escapedWorkingDir}' && '{escapedNpmPath}' install";
+                        
+                        ProcessStartInfo installInfo = new ProcessStartInfo
+                        {
+                            FileName = "/bin/sh",
+                            Arguments = $"-c \"{shellCommand}\"",
+                            UseShellExecute = false,
+                            CreateNoWindow = true,
+                            RedirectStandardOutput = true,
+                            RedirectStandardError = true,
+                            StandardOutputEncoding = Encoding.UTF8,
+                            StandardErrorEncoding = Encoding.UTF8
+                        };
+                        
+                        using (Process installProcess = Process.Start(installInfo))
+                        {
+                            if (installProcess == null)
+                            {
+                                return false;
+                            }
+
+                            string output = installProcess.StandardOutput.ReadToEnd();
+                            string error = installProcess.StandardError.ReadToEnd();
+                            
+                            installProcess.WaitForExit();
+
+                            if (installProcess.ExitCode == 0)
+                            {
+                                return true;
+                            }
+                            else
+                            {
+                                Debug.LogError($"[BoothBridge] npm install失敗 (終了コード: {installProcess.ExitCode})");
+                                if (!string.IsNullOrEmpty(error))
+                                {
+                                    Debug.LogError($"[BoothBridge] エラー: {error}");
+                                }
+                                if (!string.IsNullOrEmpty(output))
+                                {
+                                    Debug.LogError($"[BoothBridge] 出力: {output}");
+                                }
+                                return false;
+                            }
+                        }
+                    }
+                }
                 
-                using (Process installProcess = Process.Start(installInfo))
+                // 通常の方法でnpmを実行（バンドルされていないNode.jsを使用している場合）
                 {
-                    if (installProcess == null)
+                    // 通常の方法でnpmを実行
+                    ProcessStartInfo installInfo = new ProcessStartInfo
                     {
-                        return false;
-                    }
-
-                    string output = installProcess.StandardOutput.ReadToEnd();
-                    string error = installProcess.StandardError.ReadToEnd();
+                        FileName = npmPath,
+                        Arguments = "install",
+                        WorkingDirectory = workingDirectory,
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        StandardOutputEncoding = Encoding.UTF8,
+                        StandardErrorEncoding = Encoding.UTF8
+                    };
                     
-                    installProcess.WaitForExit();
-                    
-                    if (!string.IsNullOrEmpty(error))
+                    using (Process installProcess = Process.Start(installInfo))
                     {
-                        Debug.LogError($"[BoothBridge] npm install警告:\n{error}");
-                    }
+                        if (installProcess == null)
+                        {
+                            return false;
+                        }
 
-                    if (installProcess.ExitCode == 0)
-                    {
-                        return true;
-                    }
-                    else
-                    {
-                        Debug.LogError($"[BoothBridge] npm install失敗 (終了コード: {installProcess.ExitCode})");
-                        return false;
+                        string output = installProcess.StandardOutput.ReadToEnd();
+                        string error = installProcess.StandardError.ReadToEnd();
+                        
+                        installProcess.WaitForExit();
+
+                        if (installProcess.ExitCode == 0)
+                        {
+                            return true;
+                        }
+                        else
+                        {
+                            Debug.LogError($"[BoothBridge] npm install失敗 (終了コード: {installProcess.ExitCode})");
+                            if (!string.IsNullOrEmpty(error))
+                            {
+                                Debug.LogError($"[BoothBridge] エラー: {error}");
+                            }
+                            if (!string.IsNullOrEmpty(output))
+                            {
+                                Debug.LogError($"[BoothBridge] 出力: {output}");
+                            }
+                            return false;
+                        }
                     }
                 }
             }

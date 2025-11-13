@@ -1,7 +1,7 @@
 # BOOTH Import Assistant
 
 **BOOTHライブラリから直接Unityプロジェクトにアセットをインポートするツール**  
-VRChatアバター開発者向けの効率化ツールです。
+VRChatアバター改変の効率化ツールです。
 
 <div align="center">
 
@@ -38,7 +38,7 @@ VRChatアバター開発者向けの効率化ツールです。
 1. 上の「VCCに追加」ボタンをクリック
 2. VCCが自動起動してリポジトリが追加されます
 3. プロジェクトに移動して「BOOTH Import Assistant」を追加
-4. 完了！Node.jsのインストールは不要です 🎉
+4. 完了！Node.jsのインストールは不要です
 
 ---
 
@@ -46,7 +46,7 @@ VRChatアバター開発者向けの効率化ツールです。
 
 1. [Releases](https://github.com/natuki53/Booth_Import_Assistant/releases) から最新版をダウンロード
 2. `Assets/BoothImportAssistant/` フォルダを自分のUnityプロジェクトの `Assets/` フォルダにコピー
-3. 完了！ **Node.jsのインストールは不要です** 🎉
+3. 完了！ **Node.jsのインストールは不要です**
 
 ### ブラウザ拡張機能のインストール（必須）
 

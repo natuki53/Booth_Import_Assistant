@@ -135,6 +135,10 @@ namespace BoothImportAssistant.Presenters
                         PackageImportDialog.ShowDialog(packagesToImport, (selectedPackages) =>
                         {
                             packageImport.EnqueueMultipleImports(selectedPackages);
+                        }, (cancelledPackages) =>
+                        {
+                            // キャンセル時にファイルを削除
+                            DeletePackages(cancelledPackages);
                         });
                     }
                     else
@@ -147,6 +151,11 @@ namespace BoothImportAssistant.Presenters
                             "インポート", "キャンセル"))
                         {
                             packageImport.EnqueueImport(packagesToImport[0]);
+                        }
+                        else
+                        {
+                            // キャンセル時にファイルを削除
+                            DeletePackages(packagesToImport);
                         }
                     }
                 }
@@ -257,6 +266,28 @@ namespace BoothImportAssistant.Presenters
         public void SetSelectedDownloadIndex(string assetId, int index)
         {
             selectedDownloadIndex[assetId] = index;
+        }
+
+        /// <summary>
+        /// パッケージファイルを削除
+        /// </summary>
+        private void DeletePackages(List<string> packagePaths)
+        {
+            foreach (string packagePath in packagePaths)
+            {
+                try
+                {
+                    if (File.Exists(packagePath))
+                    {
+                        File.Delete(packagePath);
+                        Debug.Log($"[BoothBridge] パッケージファイルを削除しました: {Path.GetFileName(packagePath)}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[BoothBridge] パッケージファイル削除失敗: {Path.GetFileName(packagePath)} - {ex.Message}");
+                }
+            }
         }
 
         public void Dispose()

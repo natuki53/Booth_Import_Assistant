@@ -15,13 +15,15 @@ namespace BoothImportAssistant.UI
         private List<string> packagePaths;
         private Dictionary<string, bool> packageSelections;
         private Action<List<string>> onImport;
+        private Action<List<string>> onCancel;
         private Vector2 scrollPosition;
 
-        public static void ShowDialog(List<string> packages, Action<List<string>> callback)
+        public static void ShowDialog(List<string> packages, Action<List<string>> callback, Action<List<string>> onCancelCallback = null)
         {
             var window = GetWindow<PackageImportDialog>(true, "UnityPackageをインポート");
             window.packagePaths = packages;
             window.onImport = callback;
+            window.onCancel = onCancelCallback;
             window.packageSelections = new Dictionary<string, bool>();
             
             // すべてデフォルトで選択
@@ -96,6 +98,11 @@ namespace BoothImportAssistant.UI
             // キャンセル
             if (GUILayout.Button("キャンセル", GUILayout.Height(30), GUILayout.Width(100)))
             {
+                // キャンセル時にコールバックを呼び出す
+                if (onCancel != null)
+                {
+                    onCancel(packagePaths);
+                }
                 Close();
             }
             

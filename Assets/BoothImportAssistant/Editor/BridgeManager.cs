@@ -507,51 +507,71 @@ namespace BoothImportAssistant
 
         private static string GetBridgeScriptPath()
         {
-            // AssetDatabaseを使用してパスを取得（Unityのアセットパスは常にスラッシュを使用）
-            // VPM経由でインストールされた場合、Packages/から始まる可能性がある
-            string[] possiblePaths = new string[]
+            // BridgeManager.csの位置から相対的にbridge.jsを探す
+            // これにより、Assets/でもPackages/でも正しく見つけられる
+            string[] bridgeManagerGuids = AssetDatabase.FindAssets("BridgeManager t:Script", new[] { "Assets", "Packages" });
+            foreach (string guid in bridgeManagerGuids)
             {
-                "Assets/BoothImportAssistant/Editor/BridgeManager.cs",
-                "Packages/com.natuki.booth-import-assistant/Editor/BridgeManager.cs"
-            };
-            
-            foreach (string assetPath in possiblePaths)
-            {
-                string guid = AssetDatabase.AssetPathToGUID(assetPath);
-                if (!string.IsNullOrEmpty(guid))
+                string bridgeManagerPath = AssetDatabase.GUIDToAssetPath(guid);
+                if (string.IsNullOrEmpty(bridgeManagerPath))
                 {
-                    string bridgeManagerPath = AssetDatabase.GUIDToAssetPath(guid);
-                    // パスを正規化（バックスラッシュをスラッシュに変換）
-                    bridgeManagerPath = bridgeManagerPath.Replace('\\', '/');
-                    
-                    // アセットパスをファイルシステムパスに変換
-                    string fullPath = null;
-                    if (bridgeManagerPath.StartsWith("Assets/"))
+                    continue;
+                }
+                
+                // アセットパスをファイルシステムパスに変換
+                string fullPath = null;
+                if (bridgeManagerPath.StartsWith("Assets/"))
+                {
+                    fullPath = Path.GetFullPath(bridgeManagerPath.Replace("Assets/", Application.dataPath + "/"));
+                }
+                else if (bridgeManagerPath.StartsWith("Packages/"))
+                {
+                    string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+                    if (!string.IsNullOrEmpty(projectRoot))
                     {
-                        fullPath = Path.GetFullPath(bridgeManagerPath.Replace("Assets/", Application.dataPath + "/"));
+                        projectRoot = projectRoot.Replace('\\', '/');
                     }
-                    else if (bridgeManagerPath.StartsWith("Packages/"))
+                    
+                    // 通常のPackages/パスを試す
+                    string packagesPath = Path.Combine(projectRoot, bridgeManagerPath);
+                    if (File.Exists(packagesPath))
                     {
-                        // Packages/はプロジェクトルートからの相対パス
-                        string projectRoot = Directory.GetParent(Application.dataPath).FullName;
-                        if (!string.IsNullOrEmpty(projectRoot))
-                        {
-                            projectRoot = projectRoot.Replace('\\', '/');
-                        }
-                        fullPath = Path.GetFullPath(Path.Combine(projectRoot, bridgeManagerPath));
+                        fullPath = Path.GetFullPath(packagesPath);
                     }
                     else
                     {
-                        fullPath = Path.GetFullPath(bridgeManagerPath);
+                        // Library/PackageCache/を試す
+                        string packageName = bridgeManagerPath.Split('/')[1];
+                        string relativePath = bridgeManagerPath.Substring(bridgeManagerPath.IndexOf('/', bridgeManagerPath.IndexOf('/') + 1) + 1);
+                        string packageCacheDir = Path.Combine(projectRoot, "Library", "PackageCache");
+                        if (Directory.Exists(packageCacheDir))
+                        {
+                            string[] packageDirs = Directory.GetDirectories(packageCacheDir, packageName + "@*");
+                            foreach (string packageDir in packageDirs)
+                            {
+                                string candidatePath = Path.Combine(packageDir, relativePath);
+                                if (File.Exists(candidatePath))
+                                {
+                                    fullPath = Path.GetFullPath(candidatePath);
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        if (string.IsNullOrEmpty(fullPath))
+                        {
+                            fullPath = Path.GetFullPath(packagesPath);
+                        }
                     }
-                    
-                    // fullPathが取得できなかった場合はスキップ
-                    if (string.IsNullOrEmpty(fullPath))
-                    {
-                        continue;
-                    }
-                    
-                    // パスを正規化
+                }
+                else
+                {
+                    fullPath = Path.GetFullPath(bridgeManagerPath);
+                }
+                
+                if (!string.IsNullOrEmpty(fullPath) && File.Exists(fullPath))
+                {
+                    // BridgeManager.csからBridge/bridge.jsへの相対パスを構築
                     fullPath = fullPath.Replace('\\', '/');
                     string editorFolder = Path.GetDirectoryName(fullPath);
                     if (!string.IsNullOrEmpty(editorFolder))
@@ -564,39 +584,13 @@ namespace BoothImportAssistant
                         boothImportAssistantFolder = boothImportAssistantFolder.Replace('\\', '/');
                     }
                     string bridgePath = Path.Combine(boothImportAssistantFolder, "Bridge", "bridge.js");
+                    bridgePath = bridgePath.Replace('\\', '/');
                     
-                    // パスを正規化（バックスラッシュをスラッシュに変換）
-                    return bridgePath.Replace('\\', '/');
-                }
-            }
-            
-            // フォールバック: StackTraceを使用
-            try
-            {
-                string scriptPath = new System.Diagnostics.StackTrace(true).GetFrame(0).GetFileName();
-                if (!string.IsNullOrEmpty(scriptPath))
-                {
-                    // パスを正規化（バックスラッシュをスラッシュに変換）
-                    scriptPath = scriptPath.Replace('\\', '/');
-                    string editorFolder = Path.GetDirectoryName(scriptPath);
-                    if (!string.IsNullOrEmpty(editorFolder))
+                    if (File.Exists(bridgePath))
                     {
-                        editorFolder = editorFolder.Replace('\\', '/');
+                        return bridgePath;
                     }
-                    string boothImportAssistantFolder = Directory.GetParent(editorFolder).FullName;
-                    if (!string.IsNullOrEmpty(boothImportAssistantFolder))
-                    {
-                        boothImportAssistantFolder = boothImportAssistantFolder.Replace('\\', '/');
-                    }
-                    string bridgePath = Path.Combine(boothImportAssistantFolder, "Bridge", "bridge.js");
-                    
-                    // パスを正規化
-                    return bridgePath.Replace('\\', '/');
                 }
-            }
-            catch
-            {
-                // StackTrace取得に失敗した場合の処理
             }
             
             // 最後のフォールバック: 相対パスから構築

@@ -534,6 +534,9 @@ namespace BoothImportAssistant
                     continue;
                 }
                 
+                // AssetDatabaseのパスを正規化（バックスラッシュをスラッシュに変換）
+                bridgeManagerPath = bridgeManagerPath.Replace('\\', '/');
+                
                 // アセットパスをファイルシステムパスに変換
                 string fullPath = null;
                 if (bridgeManagerPath.StartsWith("Assets/"))

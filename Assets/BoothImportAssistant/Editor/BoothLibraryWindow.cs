@@ -596,7 +596,15 @@ namespace BoothImportAssistant
                 return null;
             }
             
-            return Directory.GetParent(dataPath).FullName;
+            var parent = Directory.GetParent(dataPath);
+            if (parent == null)
+            {
+                return null;
+            }
+            
+            string projectPath = parent.FullName;
+            // macOSでもバックスラッシュが含まれる可能性があるため、スラッシュに正規化
+            return projectPath.Replace('\\', '/');
         }
     }
 }

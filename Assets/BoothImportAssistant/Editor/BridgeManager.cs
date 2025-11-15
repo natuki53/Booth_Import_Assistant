@@ -82,7 +82,9 @@ namespace BoothImportAssistant
                 bridgeFolder = bridgeFolder.Replace('\\', '/');
             }
             string nodeModulesPath = Path.Combine(bridgeFolder, "node_modules");
+            nodeModulesPath = nodeModulesPath.Replace('\\', '/');
             string packageJsonPath = Path.Combine(bridgeFolder, "package.json");
+            packageJsonPath = packageJsonPath.Replace('\\', '/');
             
             if (File.Exists(packageJsonPath) && !Directory.Exists(nodeModulesPath))
             {
@@ -350,7 +352,14 @@ namespace BoothImportAssistant
             }
             
             // Assets/ の親ディレクトリがプロジェクトルート
-            return Directory.GetParent(dataPath).FullName;
+            var parent = Directory.GetParent(dataPath);
+            if (parent == null)
+            {
+                return null;
+            }
+            string projectPath = parent.FullName;
+            // macOSでもバックスラッシュが含まれる可能性があるため、スラッシュに正規化
+            return projectPath.Replace('\\', '/');
         }
 
         private static string FindNodePath()
@@ -408,12 +417,15 @@ namespace BoothImportAssistant
                     if (nodePath.Contains("*"))
                     {
                         string baseDir = Path.GetDirectoryName(Path.GetDirectoryName(nodePath));
+                        baseDir = baseDir?.Replace('\\', '/');
                         if (Directory.Exists(baseDir))
                         {
                             var dirs = Directory.GetDirectories(baseDir);
                             foreach (var dir in dirs)
                             {
-                                string fullPath = Path.Combine(dir, "bin", "node");
+                                string normalizedDir = dir.Replace('\\', '/');
+                                string fullPath = Path.Combine(normalizedDir, "bin", "node");
+                                fullPath = fullPath.Replace('\\', '/');
                                 if (File.Exists(fullPath))
                                 {
                                     return fullPath;
@@ -463,11 +475,14 @@ namespace BoothImportAssistant
                 bridgeFolder = bridgeFolder.Replace('\\', '/');
             }
             string runtimeFolder = Path.Combine(bridgeFolder, "node-runtime");
+            runtimeFolder = runtimeFolder.Replace('\\', '/');
             
             #if UNITY_EDITOR_WIN
-                return Path.Combine(runtimeFolder, "win-x64", "node.exe");
+                string nodePath = Path.Combine(runtimeFolder, "win-x64", "node.exe");
+                return nodePath.Replace('\\', '/');
             #elif UNITY_EDITOR_OSX
                 string nodePath = Path.Combine(runtimeFolder, "osx-x64", "node");
+                nodePath = nodePath.Replace('\\', '/');
                 if (File.Exists(nodePath))
                 {
                     try
@@ -485,6 +500,7 @@ namespace BoothImportAssistant
                 return nodePath;
             #elif UNITY_EDITOR_LINUX
                 string nodePath = Path.Combine(runtimeFolder, "linux-x64", "node");
+                nodePath = nodePath.Replace('\\', '/');
                 if (File.Exists(nodePath))
                 {
                     try
@@ -523,6 +539,11 @@ namespace BoothImportAssistant
                 if (bridgeManagerPath.StartsWith("Assets/"))
                 {
                     fullPath = Path.GetFullPath(bridgeManagerPath.Replace("Assets/", Application.dataPath + "/"));
+                    // macOSでもバックスラッシュが含まれる可能性があるため、スラッシュに正規化
+                    if (!string.IsNullOrEmpty(fullPath))
+                    {
+                        fullPath = fullPath.Replace('\\', '/');
+                    }
                 }
                 else if (bridgeManagerPath.StartsWith("Packages/"))
                 {
@@ -534,9 +555,15 @@ namespace BoothImportAssistant
                     
                     // 通常のPackages/パスを試す
                     string packagesPath = Path.Combine(projectRoot, bridgeManagerPath);
+                    // Path.Combineの結果も正規化
+                    packagesPath = packagesPath.Replace('\\', '/');
                     if (File.Exists(packagesPath))
                     {
                         fullPath = Path.GetFullPath(packagesPath);
+                        if (!string.IsNullOrEmpty(fullPath))
+                        {
+                            fullPath = fullPath.Replace('\\', '/');
+                        }
                     }
                     else
                     {
@@ -544,15 +571,22 @@ namespace BoothImportAssistant
                         string packageName = bridgeManagerPath.Split('/')[1];
                         string relativePath = bridgeManagerPath.Substring(bridgeManagerPath.IndexOf('/', bridgeManagerPath.IndexOf('/') + 1) + 1);
                         string packageCacheDir = Path.Combine(projectRoot, "Library", "PackageCache");
+                        packageCacheDir = packageCacheDir.Replace('\\', '/');
                         if (Directory.Exists(packageCacheDir))
                         {
                             string[] packageDirs = Directory.GetDirectories(packageCacheDir, packageName + "@*");
                             foreach (string packageDir in packageDirs)
                             {
-                                string candidatePath = Path.Combine(packageDir, relativePath);
+                                string normalizedPackageDir = packageDir.Replace('\\', '/');
+                                string candidatePath = Path.Combine(normalizedPackageDir, relativePath);
+                                candidatePath = candidatePath.Replace('\\', '/');
                                 if (File.Exists(candidatePath))
                                 {
                                     fullPath = Path.GetFullPath(candidatePath);
+                                    if (!string.IsNullOrEmpty(fullPath))
+                                    {
+                                        fullPath = fullPath.Replace('\\', '/');
+                                    }
                                     break;
                                 }
                             }
@@ -561,12 +595,20 @@ namespace BoothImportAssistant
                         if (string.IsNullOrEmpty(fullPath))
                         {
                             fullPath = Path.GetFullPath(packagesPath);
+                            if (!string.IsNullOrEmpty(fullPath))
+                            {
+                                fullPath = fullPath.Replace('\\', '/');
+                            }
                         }
                     }
                 }
                 else
                 {
                     fullPath = Path.GetFullPath(bridgeManagerPath);
+                    if (!string.IsNullOrEmpty(fullPath))
+                    {
+                        fullPath = fullPath.Replace('\\', '/');
+                    }
                 }
                 
                 if (!string.IsNullOrEmpty(fullPath) && File.Exists(fullPath))
@@ -578,17 +620,18 @@ namespace BoothImportAssistant
                     {
                         editorFolder = editorFolder.Replace('\\', '/');
                     }
-                    string boothImportAssistantFolder = Directory.GetParent(editorFolder).FullName;
-                    if (!string.IsNullOrEmpty(boothImportAssistantFolder))
+                    var parentDir = Directory.GetParent(editorFolder);
+                    if (parentDir != null)
                     {
-                        boothImportAssistantFolder = boothImportAssistantFolder.Replace('\\', '/');
-                    }
-                    string bridgePath = Path.Combine(boothImportAssistantFolder, "Bridge", "bridge.js");
-                    bridgePath = bridgePath.Replace('\\', '/');
-                    
-                    if (File.Exists(bridgePath))
-                    {
-                        return bridgePath;
+                        string boothImportAssistantFolder = parentDir.FullName;
+                        boothImportAssistantFolder = boothImportAssistantFolder?.Replace('\\', '/') ?? boothImportAssistantFolder;
+                        string bridgePath = Path.Combine(boothImportAssistantFolder, "Bridge", "bridge.js");
+                        bridgePath = bridgePath.Replace('\\', '/');
+                        
+                        if (File.Exists(bridgePath))
+                        {
+                            return bridgePath;
+                        }
                     }
                 }
             }
@@ -650,12 +693,15 @@ namespace BoothImportAssistant
                     if (npmPath.Contains("*"))
                     {
                         string baseDir = Path.GetDirectoryName(Path.GetDirectoryName(npmPath));
+                        baseDir = baseDir?.Replace('\\', '/');
                         if (Directory.Exists(baseDir))
                         {
                             var dirs = Directory.GetDirectories(baseDir);
                             foreach (var dir in dirs)
                             {
-                                string fullPath = Path.Combine(dir, "bin", "npm");
+                                string normalizedDir = dir.Replace('\\', '/');
+                                string fullPath = Path.Combine(normalizedDir, "bin", "npm");
+                                fullPath = fullPath.Replace('\\', '/');
                                 if (File.Exists(fullPath))
                                 {
                                     return fullPath;
@@ -705,11 +751,13 @@ namespace BoothImportAssistant
                 // npmコマンドのパスを取得
                 string npmPath;
                 string nodeDir = Path.GetDirectoryName(nodePath);
+                nodeDir = nodeDir?.Replace('\\', '/') ?? nodeDir;
                 
                 if (Application.platform == RuntimePlatform.WindowsEditor)
                 {
                     // Windows: まずnode.exeと同じディレクトリのnpm.cmdを確認
                     npmPath = Path.Combine(nodeDir, "npm.cmd");
+                    npmPath = npmPath.Replace('\\', '/');
                     if (!File.Exists(npmPath))
                     {
                         // npm.cmdが見つからない場合、システムのnpmを使用
@@ -720,6 +768,7 @@ namespace BoothImportAssistant
                 {
                     // Mac/Linux: nodeと同じディレクトリのnpm、またはシステムのnpm
                     npmPath = Path.Combine(nodeDir, "npm");
+                    npmPath = npmPath.Replace('\\', '/');
                     if (!File.Exists(npmPath))
                     {
                         // バンドルされたNode.jsを使用している場合、システムのnpmのフルパスを検索
@@ -747,7 +796,10 @@ namespace BoothImportAssistant
                         if (!string.IsNullOrEmpty(npmPath) && File.Exists(npmPath))
                         {
                             string npmDir = Path.GetDirectoryName(npmPath);
-                            if (File.Exists(Path.Combine(npmDir, "node.exe")))
+                            npmDir = npmDir?.Replace('\\', '/') ?? npmDir;
+                            string nodeExePath = Path.Combine(npmDir, "node.exe");
+                            nodeExePath = nodeExePath.Replace('\\', '/');
+                            if (File.Exists(nodeExePath))
                             {
                                 nodePathForNpm = npmDir;
                             }
@@ -824,7 +876,10 @@ namespace BoothImportAssistant
                         if (!string.IsNullOrEmpty(npmPath) && File.Exists(npmPath))
                         {
                             string npmDir = Path.GetDirectoryName(npmPath);
-                            if (File.Exists(Path.Combine(npmDir, "node")))
+                            npmDir = npmDir?.Replace('\\', '/') ?? npmDir;
+                            string nodePathCheck = Path.Combine(npmDir, "node");
+                            nodePathCheck = nodePathCheck.Replace('\\', '/');
+                            if (File.Exists(nodePathCheck))
                             {
                                 nodePathForNpm = npmDir;
                             }
@@ -845,6 +900,7 @@ namespace BoothImportAssistant
                                 if (File.Exists(commonNodePath))
                                 {
                                     nodePathForNpm = Path.GetDirectoryName(commonNodePath);
+                                    nodePathForNpm = nodePathForNpm?.Replace('\\', '/') ?? nodePathForNpm;
                                     break;
                                 }
                             }

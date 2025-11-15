@@ -26,9 +26,10 @@ namespace BoothImportAssistant.Services
 
         public void StartWatchingJson(string jsonFilePath)
         {
-            this.jsonFilePath = jsonFilePath;
-            jsonDirectory = Path.GetDirectoryName(jsonFilePath);
-            jsonFilename = Path.GetFileName(jsonFilePath);
+            this.jsonFilePath = jsonFilePath.Replace('\\', '/');
+            jsonDirectory = Path.GetDirectoryName(this.jsonFilePath);
+            jsonDirectory = jsonDirectory?.Replace('\\', '/') ?? jsonDirectory;
+            jsonFilename = Path.GetFileName(this.jsonFilePath);
 
             if (!Directory.Exists(jsonDirectory))
             {
@@ -61,6 +62,7 @@ namespace BoothImportAssistant.Services
             jsonWatcher.Created += (sender, e) =>
             {
                 string fullPath = Path.Combine(jsonDirectory, e.Name);
+                fullPath = fullPath.Replace('\\', '/');
                 if (fullPath.Equals(jsonFilePath, StringComparison.OrdinalIgnoreCase) || 
                     e.Name.Equals(jsonFilename, StringComparison.OrdinalIgnoreCase))
                 {
@@ -106,6 +108,7 @@ namespace BoothImportAssistant.Services
 
         public void StartWatchingPackages(string packageDirectory)
         {
+            packageDirectory = packageDirectory?.Replace('\\', '/') ?? packageDirectory;
             if (!Directory.Exists(packageDirectory))
             {
                 Directory.CreateDirectory(packageDirectory);
@@ -119,7 +122,8 @@ namespace BoothImportAssistant.Services
             packageWatcher.Created += (sender, e) =>
             {
                 System.Threading.Thread.Sleep(500);
-                OnPackageFileCreated?.Invoke(e.FullPath);
+                string normalizedPath = e.FullPath.Replace('\\', '/');
+                OnPackageFileCreated?.Invoke(normalizedPath);
             };
             packageWatcher.EnableRaisingEvents = true;
         }

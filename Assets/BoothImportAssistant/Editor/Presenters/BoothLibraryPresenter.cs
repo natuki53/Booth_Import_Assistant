@@ -61,6 +61,7 @@ namespace BoothImportAssistant.Presenters
 
             string jsonPath = repository.GetJsonFilePath();
             string packagePath = Path.Combine(projectPath, "BoothBridge", "temp");
+            packagePath = packagePath.Replace('\\', '/');
 
             fileWatcher.StartWatchingJson(jsonPath);
             fileWatcher.StartWatchingPackages(packagePath);
@@ -103,9 +104,15 @@ namespace BoothImportAssistant.Presenters
             
             // tempフォルダ内のすべての.unitypackageファイルをスキャン
             string tempPackagePath = Path.Combine(projectPath, "BoothBridge", "temp");
+            tempPackagePath = tempPackagePath.Replace('\\', '/');
             if (Directory.Exists(tempPackagePath))
             {
                 string[] allPackages = Directory.GetFiles(tempPackagePath, "*.unitypackage");
+                // パスを正規化（バックスラッシュをスラッシュに変換）
+                for (int i = 0; i < allPackages.Length; i++)
+                {
+                    allPackages[i] = allPackages[i].Replace('\\', '/');
+                }
                 
                 // 検出されたパッケージと実際のファイルを比較
                 List<string> packagesToImport = new List<string>();
@@ -162,8 +169,22 @@ namespace BoothImportAssistant.Presenters
             }
         }
 
+        private const string CONSENT_PREF_KEY = "BoothImportAssistant_ConsentGiven";
+
         public void SyncWithBooth()
         {
+            // 初回利用時の同意確認
+            if (!HasUserConsent())
+            {
+                if (!ShowConsentDialog())
+                {
+                    // ユーザーが同意しなかった場合は処理を中断
+                    return;
+                }
+                // 同意した場合はEditorPrefsに保存
+                EditorPrefs.SetBool(CONSENT_PREF_KEY, true);
+            }
+
             if (bridge.IsBridgeRunning())
             {
                 bridge.StopBridge();
@@ -185,6 +206,34 @@ namespace BoothImportAssistant.Presenters
             EditorUtility.DisplayDialog("同期開始",
                 "BOOTHページが開きました。\n\nページ読み込み完了後、購入した商品とギフトを自動的に同期します。\n完了まで数秒お待ちください。",
                 "OK");
+        }
+
+        private bool HasUserConsent()
+        {
+            return EditorPrefs.GetBool(CONSENT_PREF_KEY, false);
+        }
+
+        private bool ShowConsentDialog()
+        {
+            string message = 
+                "本ツールは、BOOTHのライブラリページから以下の情報を取得します：\n\n" +
+                "・購入した商品の情報（商品名、作者、サムネイルなど）\n" +
+                "・ギフトで受け取った商品の情報\n" +
+                "・ダウンロードリンク\n\n" +
+                "【重要な注意事項】\n" +
+                "・取得した情報はすべてローカル（localhost）で処理されます\n" +
+                "・外部のサーバーには一切送信されません\n" +
+                "・ユーザー自身の購入ライブラリページのみにアクセスします\n" +
+                "・ログインが必要なページにアクセスするため、ブラウザでログインしている必要があります\n\n" +
+                "このツールを使用することで、上記の情報取得に同意したものとみなされます。\n\n" +
+                "同意して続行しますか？";
+
+            return EditorUtility.DisplayDialog(
+                "利用規約への同意",
+                message,
+                "同意する",
+                "キャンセル"
+            );
         }
 
         public bool ReloadAssets()

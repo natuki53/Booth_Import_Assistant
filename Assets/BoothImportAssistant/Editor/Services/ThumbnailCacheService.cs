@@ -53,6 +53,9 @@ namespace BoothImportAssistant.Services
                 fullPath = Path.Combine(projectPath, pathOrRelativePath);
             }
             
+            // パスを正規化（バックスラッシュをスラッシュに変換）
+            fullPath = fullPath?.Replace('\\', '/') ?? fullPath;
+            
             if (!File.Exists(fullPath))
                 return null;
 

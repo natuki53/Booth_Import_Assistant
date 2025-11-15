@@ -1,0 +1,88 @@
+name: Create Release ZIP
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., v1.0.4)'
+        required: true
+
+jobs:
+  create-zip:
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Extract version from tag
+        id: get_version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+          VERSION_NUMBER="${VERSION#v}"
+          echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
+          echo "VERSION_NUMBER=${VERSION_NUMBER}" >> $GITHUB_OUTPUT
+          echo "Version: ${VERSION}"
+          echo "Version Number: ${VERSION_NUMBER}"
+      
+      - name: Create ZIP file
+        shell: pwsh
+        run: |
+          $version = "${{ steps.get_version.outputs.VERSION_NUMBER }}"
+          $zipName = "com.natuki.booth-import-assistant-$version.zip"
+          
+          Write-Host "Creating ZIP file: $zipName"
+          
+          # PowerShellでZIPファイルを作成（Windows互換性を確保）
+          Compress-Archive -Path "Assets\BoothImportAssistant\*" -DestinationPath $zipName -Force
+          
+          # ZIPファイルの内容を確認
+          Write-Host "ZIP file created: $zipName"
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = [System.IO.Compression.ZipFile]::OpenRead($zipName)
+          Write-Host "Files in ZIP (first 10):"
+          $zip.Entries | Select-Object -First 10 FullName | ForEach-Object { Write-Host $_.FullName }
+          Write-Host "Total files: $($zip.Entries.Count)"
+          $zip.Dispose()
+      
+      - name: Calculate SHA256
+        id: sha256
+        shell: pwsh
+        run: |
+          $version = "${{ steps.get_version.outputs.VERSION_NUMBER }}"
+          $zipName = "com.natuki.booth-import-assistant-$version.zip"
+          $hash = (Get-FileHash -Path $zipName -Algorithm SHA256).Hash.ToUpper()
+          echo "SHA256=$hash" >> $env:GITHUB_OUTPUT
+          Write-Host "SHA256: $hash"
+      
+      - name: Upload ZIP to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            com.natuki.booth-import-assistant-${{ steps.get_version.outputs.VERSION_NUMBER }}.zip
+          tag_name: ${{ steps.get_version.outputs.VERSION }}
+          name: Release ${{ steps.get_version.outputs.VERSION }}
+          body: |
+            ## Changes in ${{ steps.get_version.outputs.VERSION }}
+            
+            - Add user consent dialog on first launch
+            - Fix path normalization issues causing backslash errors on Mac when installed via VPM
+            - Normalize all file paths to use forward slashes consistently across all platforms
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Output SHA256 for index.json
+        shell: pwsh
+        run: |
+          Write-Host "::notice title=SHA256 Hash::Add this to index.json: ${{ steps.sha256.outputs.SHA256 }}"
+

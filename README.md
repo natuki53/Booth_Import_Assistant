@@ -8,7 +8,7 @@ VRChatアバター改変の効率化ツールです。
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Unity](https://img.shields.io/badge/Unity-2022.3%2B-blue.svg)](https://unity.com/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
-[![Version](https://img.shields.io/badge/Version-1.0.3-green.svg)](https://github.com/natuki53/Booth_Import_Assistant/releases)
+[![Version](https://img.shields.io/badge/Version-1.0.4-green.svg)](https://github.com/natuki53/Booth_Import_Assistant/releases)
 
 </div>
 

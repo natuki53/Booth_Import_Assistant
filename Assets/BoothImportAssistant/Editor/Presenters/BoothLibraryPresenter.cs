@@ -173,18 +173,19 @@ namespace BoothImportAssistant.Presenters
 
         public void SyncWithBooth()
         {
-            // 初回利用時の同意確認
+            // 初回利用時の同意確認（同意後にbridgeを起動するため、先に確認）
             if (!HasUserConsent())
             {
                 if (!ShowConsentDialog())
                 {
-                    // ユーザーが同意しなかった場合は処理を中断
+                    // ユーザーが同意しなかった場合は処理を中断（bridgeは起動しない）
                     return;
                 }
                 // 同意した場合はEditorPrefsに保存
                 EditorPrefs.SetBool(CONSENT_PREF_KEY, true);
             }
 
+            // 同意確認後にbridgeを起動
             if (bridge.IsBridgeRunning())
             {
                 bridge.StopBridge();
@@ -216,23 +217,27 @@ namespace BoothImportAssistant.Presenters
         private bool ShowConsentDialog()
         {
             string message = 
-                "本ツールは、BOOTHのライブラリページから以下の情報を取得します：\n\n" +
-                "・購入した商品の情報（商品名、作者、サムネイルなど）\n" +
-                "・ギフトで受け取った商品の情報\n" +
-                "・ダウンロードリンク\n\n" +
-                "【重要な注意事項】\n" +
-                "・取得した情報はすべてローカル（localhost）で処理されます\n" +
-                "・外部のサーバーには一切送信されません\n" +
-                "・ユーザー自身の購入ライブラリページのみにアクセスします\n" +
-                "・ログインが必要なページにアクセスするため、ブラウザでログインしている必要があります\n\n" +
-                "このツールを使用することで、上記の情報取得に同意したものとみなされます。\n\n" +
-                "同意して続行しますか？";
+                "【Important】This is an Unofficial Tool\n\n" +
+                "This tool is not provided by BOOTH and is an unofficial tool.\n" +
+                "Use of this tool is entirely at your own risk.\n\n" +
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n" +
+                "This tool retrieves the following information from your BOOTH library page:\n\n" +
+                "・Purchased product information (product name, author, thumbnails, etc.)\n" +
+                "・Gift product information\n" +
+                "・Download links\n\n" +
+                "【Important Notes】\n" +
+                "・All retrieved information is processed locally (localhost)\n" +
+                "・No data is sent to external servers\n" +
+                "・Only accesses your own purchase library page\n" +
+                "・Access to login-required pages, so you must be logged in to your browser\n\n" +
+                "By using this tool, you agree to the above information retrieval.\n\n" +
+                "Do you agree to continue?";
 
             return EditorUtility.DisplayDialog(
-                "利用規約への同意",
+                "Terms of Use Agreement",
                 message,
-                "同意する",
-                "キャンセル"
+                "Agree",
+                "Cancel"
             );
         }
 

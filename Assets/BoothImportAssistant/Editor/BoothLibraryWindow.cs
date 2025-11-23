@@ -590,7 +590,7 @@ namespace BoothImportAssistant
 
         private string GetProjectPath()
         {
-            string dataPath = Application.dataPath;
+            string dataPath = Application.dataPath.Replace('\\', '/');
             if (string.IsNullOrEmpty(dataPath))
             {
                 return null;

@@ -345,7 +345,7 @@ namespace BoothImportAssistant
 
         private static string GetProjectPath()
         {
-            string dataPath = Application.dataPath;
+            string dataPath = Application.dataPath.Replace('\\', '/');
             if (string.IsNullOrEmpty(dataPath))
             {
                 return null;
@@ -544,7 +544,9 @@ namespace BoothImportAssistant
                 string fullPath = null;
                 if (bridgeManagerPath.StartsWith("Assets/"))
                 {
-                    fullPath = Path.GetFullPath(bridgeManagerPath.Replace("Assets/", Application.dataPath + "/"));
+                    // Application.dataPathを正規化してから使用
+                    string normalizedDataPath = Application.dataPath.Replace('\\', '/');
+                    fullPath = Path.GetFullPath(bridgeManagerPath.Replace("Assets/", normalizedDataPath + "/"));
                     // macOSでもバックスラッシュが含まれる可能性があるため、スラッシュに正規化
                     if (!string.IsNullOrEmpty(fullPath))
                     {
@@ -553,7 +555,8 @@ namespace BoothImportAssistant
                 }
                 else if (bridgeManagerPath.StartsWith("Packages/"))
                 {
-                    string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+                    string normalizedDataPath = Application.dataPath.Replace('\\', '/');
+                    string projectRoot = Directory.GetParent(normalizedDataPath)?.FullName;
                     if (!string.IsNullOrEmpty(projectRoot))
                     {
                         projectRoot = projectRoot.Replace('\\', '/');
@@ -643,7 +646,7 @@ namespace BoothImportAssistant
             }
             
             // 最後のフォールバック: 相対パスから構築
-            string dataPath = Application.dataPath;
+            string dataPath = Application.dataPath.Replace('\\', '/');
             string fallbackPath = Path.Combine(dataPath, "BoothImportAssistant", "Bridge", "bridge.js");
             return fallbackPath.Replace('\\', '/');
         }

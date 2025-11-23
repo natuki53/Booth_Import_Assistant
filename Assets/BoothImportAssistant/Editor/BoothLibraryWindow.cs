@@ -190,11 +190,20 @@ namespace BoothImportAssistant
             // 同期ボタン
             if (GUILayout.Button("同期", GUILayout.Height(30), GUILayout.Width(100)))
             {
-                presenter.SyncWithBooth();
+                bool bridgeStarted = presenter.SyncWithBooth();
                 currentPage = 0; // ページを最初にリセット
-                // 同期後は即座にキャッシュを更新（Bridgeが起動されるため）
-                cachedIsBridgeRunning = true; // SyncWithBoothは必ずBridgeを起動する
-                lastBridgeStatusCheckTime = EditorApplication.timeSinceStartup;
+                // 実際にbridgeが起動した場合のみキャッシュを更新
+                if (bridgeStarted)
+                {
+                    cachedIsBridgeRunning = true;
+                    lastBridgeStatusCheckTime = EditorApplication.timeSinceStartup;
+                }
+                else
+                {
+                    // 起動しなかった場合は実際の状態を確認
+                    cachedIsBridgeRunning = presenter.IsBridgeRunning();
+                    lastBridgeStatusCheckTime = EditorApplication.timeSinceStartup;
+                }
             }
             
             // 再読み込みボタン

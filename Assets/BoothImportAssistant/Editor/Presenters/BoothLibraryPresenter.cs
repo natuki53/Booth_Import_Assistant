@@ -171,7 +171,7 @@ namespace BoothImportAssistant.Presenters
 
         private const string CONSENT_PREF_KEY = "BoothImportAssistant_ConsentGiven";
 
-        public void SyncWithBooth()
+        public bool SyncWithBooth()
         {
             // 初回利用時の同意確認（同意後にbridgeを起動するため、先に確認）
             if (!HasUserConsent())
@@ -179,7 +179,7 @@ namespace BoothImportAssistant.Presenters
                 if (!ShowConsentDialog())
                 {
                     // ユーザーが同意しなかった場合は処理を中断（bridgeは起動しない）
-                    return;
+                    return false;
                 }
                 // 同意した場合はEditorPrefsに保存
                 EditorPrefs.SetBool(CONSENT_PREF_KEY, true);
@@ -193,7 +193,7 @@ namespace BoothImportAssistant.Presenters
             }
 
             bool started = bridge.StartBridge();
-            if (!started) return;
+            if (!started) return false;
 
             EditorUtility.DisplayProgressBar("同期中", "Bridgeを起動しています...", 0.3f);
             System.Threading.Thread.Sleep(3000);
@@ -207,6 +207,8 @@ namespace BoothImportAssistant.Presenters
             EditorUtility.DisplayDialog("同期開始",
                 "BOOTHページが開きました。\n\nページ読み込み完了後、購入した商品とギフトを自動的に同期します。\n完了まで数秒お待ちください。",
                 "OK");
+
+            return true;
         }
 
         private bool HasUserConsent()

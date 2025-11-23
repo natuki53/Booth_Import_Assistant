@@ -217,27 +217,27 @@ namespace BoothImportAssistant.Presenters
         private bool ShowConsentDialog()
         {
             string message = 
-                "【Important】This is an Unofficial Tool\n\n" +
-                "This tool is not provided by BOOTH and is an unofficial tool.\n" +
-                "Use of this tool is entirely at your own risk.\n\n" +
+                "【重要】本ツールは非公式ツールです\n\n" +
+                "本ツールはBOOTH公式が提供するものではなく、非公式のツールです。\n" +
+                "使用にあたっては、すべて自己責任で行ってください。\n\n" +
                 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n" +
-                "This tool retrieves the following information from your BOOTH library page:\n\n" +
-                "・Purchased product information (product name, author, thumbnails, etc.)\n" +
-                "・Gift product information\n" +
-                "・Download links\n\n" +
-                "【Important Notes】\n" +
-                "・All retrieved information is processed locally (localhost)\n" +
-                "・No data is sent to external servers\n" +
-                "・Only accesses your own purchase library page\n" +
-                "・Access to login-required pages, so you must be logged in to your browser\n\n" +
-                "By using this tool, you agree to the above information retrieval.\n\n" +
-                "Do you agree to continue?";
+                "本ツールは、BOOTHのライブラリページから以下の情報を取得します：\n\n" +
+                "・購入した商品の情報（商品名、作者、サムネイルなど）\n" +
+                "・ギフトで受け取った商品の情報\n" +
+                "・ダウンロードリンク\n\n" +
+                "【重要な注意事項】\n" +
+                "・取得した情報はすべてローカル（localhost）で処理されます\n" +
+                "・外部のサーバーには一切送信されません\n" +
+                "・ユーザー自身の購入ライブラリページのみにアクセスします\n" +
+                "・ログインが必要なページにアクセスするため、ブラウザでログインしている必要があります\n\n" +
+                "このツールを使用することで、上記の情報取得に同意したものとみなされます。\n\n" +
+                "同意して続行しますか？";
 
             return EditorUtility.DisplayDialog(
-                "Terms of Use Agreement",
+                "利用規約への同意",
                 message,
-                "Agree",
-                "Cancel"
+                "同意する",
+                "キャンセル"
             );
         }
 

@@ -24,7 +24,9 @@ namespace BoothImportAssistant.Services
         {
             // AppDataディレクトリからJSONを読み込む
             string appDataPath = GetAppDataPath();
-            jsonFilePath = Path.Combine(appDataPath, "booth_assets.json");
+            string combinedPath = Path.Combine(appDataPath, "booth_assets.json");
+            // パスを正規化（バックスラッシュをスラッシュに変換）
+            jsonFilePath = combinedPath.Replace('\\', '/');
         }
         
         /// <summary>
@@ -48,7 +50,8 @@ namespace BoothImportAssistant.Services
                 appDataPath = Path.Combine(home, ".config", "Booth_Import_Assistant");
             #endif
             
-            return appDataPath;
+            // パスを正規化（バックスラッシュをスラッシュに変換）
+            return appDataPath.Replace('\\', '/');
         }
 
         public string GetJsonFilePath()

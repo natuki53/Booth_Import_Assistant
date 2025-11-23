@@ -383,6 +383,7 @@ namespace BoothImportAssistant
                     foreach (string path in paths)
                     {
                         string nodePath = Path.Combine(path, "node.exe");
+                        nodePath = nodePath.Replace('\\', '/');
                         if (File.Exists(nodePath))
                         {
                             return nodePath;
@@ -393,6 +394,7 @@ namespace BoothImportAssistant
                 // 一般的なインストール場所
                 string programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
                 string nodePath1 = Path.Combine(programFiles, "nodejs", "node.exe");
+                nodePath1 = nodePath1.Replace('\\', '/');
                 if (File.Exists(nodePath1)) return nodePath1;
                 
                 return null;
@@ -443,10 +445,11 @@ namespace BoothImportAssistant
                 string pathEnv = Environment.GetEnvironmentVariable("PATH");
                 if (!string.IsNullOrEmpty(pathEnv))
                 {
-                    string[] paths = pathEnv.Split(':');
+                    string[] paths = pathEnv.Split(':'); 
                     foreach (string path in paths)
                     {
                         string nodePath = Path.Combine(path, "node");
+                        nodePath = nodePath.Replace('\\', '/');
                         if (File.Exists(nodePath))
                         {
                             return nodePath;
@@ -661,6 +664,7 @@ namespace BoothImportAssistant
                     {
                         if (string.IsNullOrEmpty(path)) continue;
                         string npmPath = Path.Combine(path, "npm.cmd");
+                        npmPath = npmPath.Replace('\\', '/');
                         if (File.Exists(npmPath))
                         {
                             return npmPath;
@@ -673,6 +677,7 @@ namespace BoothImportAssistant
                 if (!string.IsNullOrEmpty(programFiles))
                 {
                     string npmPath1 = Path.Combine(programFiles, "nodejs", "npm.cmd");
+                    npmPath1 = npmPath1.Replace('\\', '/');
                     if (File.Exists(npmPath1)) return npmPath1;
                 }
                 
@@ -727,6 +732,7 @@ namespace BoothImportAssistant
                     {
                         if (string.IsNullOrEmpty(path)) continue;
                         string npmPath = Path.Combine(path, "npm");
+                        npmPath = npmPath.Replace('\\', '/');
                         if (File.Exists(npmPath))
                         {
                             return npmPath;
@@ -815,9 +821,11 @@ namespace BoothImportAssistant
                             if (!string.IsNullOrEmpty(programFiles))
                             {
                                 string nodePath1 = Path.Combine(programFiles, "nodejs", "node.exe");
+                                nodePath1 = nodePath1.Replace('\\', '/');
                                 if (File.Exists(nodePath1))
                                 {
                                     nodePathForNpm = Path.Combine(programFiles, "nodejs");
+                                    nodePathForNpm = nodePathForNpm.Replace('\\', '/');
                                 }
                             }
                         }

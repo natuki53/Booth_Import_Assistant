@@ -21,9 +21,13 @@ namespace BoothImportAssistant.Presenters
         private readonly FileWatcherService fileWatcher;
         private readonly PackageImportService packageImport;
         private readonly BridgeService bridge;
+        private readonly DownloadManagerService downloadManager;
 
         // 複数ダウンロード用の選択状態
         private Dictionary<string, int> selectedDownloadIndex = new Dictionary<string, int>();
+
+        private const string DOWNLOAD_MODE_DOWNLOAD_ONLY = "download-only";
+        private const string DOWNLOAD_MODE_DL_IMPORT = "dl-import";
 
         // イベント
         public event Action OnDataChanged;
@@ -43,11 +47,13 @@ namespace BoothImportAssistant.Presenters
             fileWatcher = new FileWatcherService();
             packageImport = new PackageImportService();
             bridge = new BridgeService();
+            downloadManager = new DownloadManagerService(projectPath);
 
             // イベント接続
             repository.OnAssetsChanged += () => OnDataChanged?.Invoke();
             fileWatcher.OnJsonFileChanged += HandleJsonFileChanged;
             fileWatcher.OnPackageFileCreated += HandlePackageDetected;
+            fileWatcher.OnDownloadsMetadataChanged += HandleDownloadsMetadataChanged;
             
             bridge.OnProgressUpdated += _ => OnDataChanged?.Invoke();
 
@@ -65,6 +71,7 @@ namespace BoothImportAssistant.Presenters
 
             fileWatcher.StartWatchingJson(jsonPath);
             fileWatcher.StartWatchingPackages(packagePath);
+            fileWatcher.StartWatchingDownloadsMetadata(downloadManager.MetadataFilePath);
         }
 
         private void HandleJsonFileChanged()
@@ -79,6 +86,12 @@ namespace BoothImportAssistant.Presenters
         private void HandlePackageDetected(string packagePath)
         {
             packageImport.DetectPackage(packagePath);
+        }
+
+        private void HandleDownloadsMetadataChanged()
+        {
+            downloadManager.ReloadMetadata();
+            OnDataChanged?.Invoke();
         }
 
         public void Update()
@@ -267,47 +280,181 @@ namespace BoothImportAssistant.Presenters
 
         public void DownloadAsset(BoothAsset asset, int downloadIndex)
         {
-            // Bridgeが起動していることを確認
-            if (!bridge.IsBridgeRunning())
+            if (!EnsureBridgeRunning())
             {
-                bool started = bridge.StartBridge();
-                if (!started)
-                {
-                    EditorUtility.DisplayDialog("エラー",
-                        "Bridgeが起動していません。\n同期を実行してください。",
-                        "OK");
-                    return;
-                }
+                return;
             }
 
-            // ダウンロードURLがある場合は直接開く
-            if (asset.downloadUrls != null &&
-                downloadIndex >= 0 &&
-                downloadIndex < asset.downloadUrls.Length &&
-                !string.IsNullOrEmpty(asset.downloadUrls[downloadIndex].url))
+            var downloadInfo = GetDownloadInfo(asset, downloadIndex);
+            if (downloadInfo != null && !string.IsNullOrEmpty(downloadInfo.url))
             {
-                string downloadUrl = asset.downloadUrls[downloadIndex].url;
-                string label = asset.downloadUrls[downloadIndex].label;
-
-                Application.OpenURL(downloadUrl);
+                bridge.RegisterDownloadMode(downloadInfo.url, downloadInfo.label, asset.id, downloadInfo.isMaterial, DOWNLOAD_MODE_DL_IMPORT);
+                Application.OpenURL(downloadInfo.url);
 
                 EditorUtility.DisplayDialog("ダウンロード",
                     "ダウンロードページが開きました。\n\n" +
-                    "対象: " + label + "\n\n" +
+                    $"対象: {downloadInfo.label}\n\n" +
                     "ダウンロード完了後、自動的にUnityに展開されます。",
                     "OK");
             }
             else
             {
-                // ダウンロードURLがない場合は商品ページを開く
                 Application.OpenURL(asset.productUrl);
-
                 EditorUtility.DisplayDialog("ダウンロード",
                     "商品ページが開きました。\n\n" +
                     "BOOTHからダウンロードしてください。\n" +
                     "ダウンロード完了後、自動的にUnityに展開されます。",
                     "OK");
             }
+        }
+
+        public void DownloadOnly(BoothAsset asset, int downloadIndex)
+        {
+            if (!EnsureBridgeRunning())
+            {
+                return;
+            }
+
+            var downloadInfo = GetDownloadInfo(asset, downloadIndex);
+            if (downloadInfo == null || string.IsNullOrEmpty(downloadInfo.url))
+            {
+                EditorUtility.DisplayDialog("ダウンロード",
+                    "ダウンロードURLが見つかりませんでした。商品ページを開きます。",
+                    "OK");
+                Application.OpenURL(asset.productUrl);
+                return;
+            }
+
+            bridge.RegisterDownloadMode(downloadInfo.url, downloadInfo.label, asset.id, downloadInfo.isMaterial, DOWNLOAD_MODE_DOWNLOAD_ONLY);
+            Application.OpenURL(downloadInfo.url);
+
+            EditorUtility.DisplayDialog("ダウンロードのみ",
+                $"{downloadInfo.label} のZIPを保存します。\n\n" +
+                "ダウンロード完了後、自動的に保存フォルダへ移動します。\nインポート確認は表示されません。",
+                "OK");
+        }
+
+        public void ImportFromSavedFile(BoothAsset asset, int downloadIndex)
+        {
+            if (asset?.downloadUrls == null)
+                return;
+
+            var info = GetDownloadInfo(asset, downloadIndex);
+            if (info == null)
+                return;
+
+            var saved = downloadManager.FindDownloadedFile(asset.id, info.label, info.isMaterial);
+            if (saved == null)
+            {
+                EditorUtility.DisplayDialog("インポート", "保存済みファイルが見つかりませんでした。", "OK");
+                return;
+            }
+
+            bool success = downloadManager.ImportFromDownloadedFile(saved);
+            if (!success)
+            {
+                return;
+            }
+
+            EditorUtility.DisplayDialog("インポート",
+                $"{saved.originalFileName} からUnityPackageを検出しました。\n既存のインポートフローに従って処理されます。",
+                "OK");
+        }
+
+        public void OverwriteDownload(BoothAsset asset, int downloadIndex)
+        {
+            if (!EnsureBridgeRunning())
+            {
+                return;
+            }
+
+            var info = GetDownloadInfo(asset, downloadIndex);
+            if (info == null || string.IsNullOrEmpty(info.url))
+            {
+                EditorUtility.DisplayDialog("上書きダウンロード",
+                    "ダウンロードURLが見つかりませんでした。商品ページを開きます。",
+                    "OK");
+                Application.OpenURL(asset?.productUrl);
+                return;
+            }
+
+            downloadManager.RemoveDownloadedFile(asset.id, info.label, info.isMaterial, true);
+
+            bridge.RegisterDownloadMode(info.url, info.label, asset.id, info.isMaterial, DOWNLOAD_MODE_DOWNLOAD_ONLY);
+            Application.OpenURL(info.url);
+
+            EditorUtility.DisplayDialog("上書きダウンロード",
+                $"{info.label} のZIPを再ダウンロードします。\nダウンロード完了後、保存先に上書きされます。",
+                "OK");
+        }
+
+        public bool HasSavedFile(BoothAsset asset, int downloadIndex)
+        {
+            var info = GetDownloadInfo(asset, downloadIndex);
+            if (info == null)
+                return false;
+
+            return downloadManager.HasDownloadedFile(asset.id, info.label, info.isMaterial);
+        }
+
+        public (int downloaded, int total) GetDownloadStatus(BoothAsset asset)
+        {
+            if (asset?.downloadUrls == null || asset.downloadUrls.Length == 0)
+            {
+                return (0, 0);
+            }
+
+            int total = asset.downloadUrls.Length;
+            int downloaded = 0;
+            foreach (var url in asset.downloadUrls)
+            {
+                if (downloadManager.HasDownloadedFile(asset.id, url.label, url.isMaterial))
+                {
+                    downloaded++;
+                }
+            }
+
+            return (downloaded, total);
+        }
+
+        public bool IsSelectedFileDownloaded(BoothAsset asset, int downloadIndex)
+        {
+            var info = GetDownloadInfo(asset, downloadIndex);
+            if (info == null)
+                return false;
+
+            return downloadManager.HasDownloadedFile(asset.id, info.label, info.isMaterial);
+        }
+
+        public List<bool> GetMaterialDownloadStatus(BoothAsset asset)
+        {
+            List<bool> result = new List<bool>();
+            if (asset?.downloadUrls == null)
+                return result;
+
+            foreach (var url in asset.downloadUrls.Where(u => u.isMaterial))
+            {
+                bool hasFile = downloadManager.HasDownloadedFile(asset.id, url.label, true);
+                result.Add(hasFile);
+            }
+
+            return result;
+        }
+
+        public void OpenDownloadFolder(BoothAsset asset)
+        {
+            if (asset == null) return;
+            downloadManager.OpenDownloadFolder(asset.id);
+        }
+
+        public IReadOnlyList<DownloadedFileInfo> GetDownloadedFiles(BoothAsset asset)
+        {
+            if (asset == null)
+            {
+                return Array.Empty<DownloadedFileInfo>();
+            }
+
+            return downloadManager.GetDownloadedFiles(asset.id);
         }
 
         public int GetSelectedDownloadIndex(string assetId)
@@ -350,6 +497,31 @@ namespace BoothImportAssistant.Presenters
         {
             fileWatcher?.Dispose();
             thumbnailCache?.Clear();
+        }
+
+        private bool EnsureBridgeRunning()
+        {
+            if (!bridge.IsBridgeRunning())
+            {
+                bool started = bridge.StartBridge();
+                if (!started)
+                {
+                    EditorUtility.DisplayDialog("エラー",
+                        "Bridgeが起動していません。\n同期を実行してください。",
+                        "OK");
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private DownloadUrl GetDownloadInfo(BoothAsset asset, int index)
+        {
+            if (asset?.downloadUrls == null || index < 0 || index >= asset.downloadUrls.Length)
+                return null;
+
+            return asset.downloadUrls[index];
         }
     }
 }

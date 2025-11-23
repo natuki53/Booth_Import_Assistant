@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using UnityEditor;
 using UnityEngine;
 using BoothImportAssistant.Models;
+using System.Text;
 
 namespace BoothImportAssistant.Services
 {
@@ -68,6 +69,48 @@ namespace BoothImportAssistant.Services
                 await Task.Delay(500);
                 isCheckingProgress = false;
             }
+        }
+
+        public async void RegisterDownloadMode(string downloadUrl, string label, string assetId, bool isMaterial, string mode)
+        {
+            if (string.IsNullOrEmpty(downloadUrl) || !IsBridgeRunning())
+            {
+                return;
+            }
+
+            try
+            {
+                using (var client = new HttpClient())
+                {
+                    client.Timeout = TimeSpan.FromSeconds(2);
+                    var payload = new DownloadModePayload
+                    {
+                        downloadUrl = downloadUrl,
+                        label = label,
+                        assetId = assetId,
+                        isMaterial = isMaterial,
+                        mode = mode
+                    };
+
+                    string json = JsonUtility.ToJson(payload);
+                    var content = new StringContent(json, Encoding.UTF8, "application/json");
+                    await client.PostAsync($"{BRIDGE_URL}/download-mode", content);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[BoothBridge] ダウンロードモード通知失敗: {ex.Message}");
+            }
+        }
+
+        [Serializable]
+        private class DownloadModePayload
+        {
+            public string downloadUrl;
+            public string label;
+            public string assetId;
+            public bool isMaterial;
+            public string mode;
         }
     }
 }

@@ -13,16 +13,22 @@ namespace BoothImportAssistant.Services
     {
         private FileSystemWatcher jsonWatcher;
         private FileSystemWatcher packageWatcher;
+        private FileSystemWatcher downloadsMetadataWatcher;
         private string jsonFilePath;
         private string jsonDirectory;
         private string jsonFilename;
+        private string metadataFilePath;
+        private string metadataDirectory;
+        private string metadataFilename;
         
         // デバウンス用
         private double lastChangeTime = 0;
+        private double lastMetadataChangeTime = 0;
         private const double DEBOUNCE_DELAY = 0.5; // 500ms
 
         public event Action OnJsonFileChanged;
         public event Action<string> OnPackageFileCreated;
+        public event Action OnDownloadsMetadataChanged;
 
         public void StartWatchingJson(string jsonFilePath)
         {
@@ -71,6 +77,70 @@ namespace BoothImportAssistant.Services
             };
             
             jsonWatcher.EnableRaisingEvents = true;
+        }
+
+        public void StartWatchingDownloadsMetadata(string metadataPath)
+        {
+            if (string.IsNullOrEmpty(metadataPath))
+            {
+                return;
+            }
+
+            metadataFilePath = metadataPath.Replace('\\', '/');
+            metadataDirectory = Path.GetDirectoryName(metadataFilePath);
+            metadataDirectory = metadataDirectory?.Replace('\\', '/');
+            metadataFilename = Path.GetFileName(metadataFilePath);
+
+            if (string.IsNullOrEmpty(metadataDirectory) || string.IsNullOrEmpty(metadataFilename))
+            {
+                return;
+            }
+
+            if (!Directory.Exists(metadataDirectory))
+            {
+                Directory.CreateDirectory(metadataDirectory);
+            }
+
+            downloadsMetadataWatcher = new FileSystemWatcher(metadataDirectory, metadataFilename)
+            {
+                NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.FileName
+            };
+
+            FileSystemEventHandler handler = (sender, e) =>
+            {
+                string fullPath = Path.Combine(metadataDirectory, e.Name).Replace('\\', '/');
+                if (fullPath.Equals(metadataFilePath, StringComparison.OrdinalIgnoreCase))
+                {
+                    HandleMetadataChange();
+                }
+            };
+
+            downloadsMetadataWatcher.Changed += handler;
+            downloadsMetadataWatcher.Created += handler;
+            downloadsMetadataWatcher.EnableRaisingEvents = true;
+        }
+
+        private void HandleMetadataChange()
+        {
+            EditorApplication.delayCall += () =>
+            {
+                double currentTime = EditorApplication.timeSinceStartup;
+                if (currentTime - lastMetadataChangeTime < DEBOUNCE_DELAY)
+                {
+                    return;
+                }
+
+                lastMetadataChangeTime = currentTime;
+
+                ThreadPool.QueueUserWorkItem(_ =>
+                {
+                    Thread.Sleep(300);
+                    EditorApplication.delayCall += () =>
+                    {
+                        OnDownloadsMetadataChanged?.Invoke();
+                    };
+                });
+            };
         }
 
         /// <summary>
@@ -142,6 +212,13 @@ namespace BoothImportAssistant.Services
                 packageWatcher.EnableRaisingEvents = false;
                 packageWatcher.Dispose();
                 packageWatcher = null;
+            }
+
+            if (downloadsMetadataWatcher != null)
+            {
+                downloadsMetadataWatcher.EnableRaisingEvents = false;
+                downloadsMetadataWatcher.Dispose();
+                downloadsMetadataWatcher = null;
             }
         }
     }

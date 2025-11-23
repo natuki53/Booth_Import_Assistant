@@ -87,6 +87,29 @@ const JSON_FILE = path.join(APP_DATA_DIR, 'booth_assets.json');
 const BACKUP_FILE = path.join(APP_DATA_DIR, 'booth_assets.backup.json');
 const TEMP_PACKAGE_DIR = path.join(projectPath, 'BoothBridge', 'temp'); // プロジェクト固有の一時ファイル
 
+function getDownloadStoragePath() {
+  let downloadRoot;
+
+  if (os.platform() === 'win32') {
+    downloadRoot = path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'Booth_Import_Assistant');
+  } else if (os.platform() === 'darwin') {
+    downloadRoot = path.join(os.homedir(), 'Library', 'Application Support', 'Booth_Import_Assistant');
+  } else {
+    downloadRoot = path.join(os.homedir(), '.config', 'Booth_Import_Assistant');
+  }
+
+  return downloadRoot;
+}
+
+const DOWNLOAD_STORAGE_ROOT = getDownloadStoragePath();
+const SAVED_DOWNLOADS_DIR = path.join(DOWNLOAD_STORAGE_ROOT, 'downloads');
+const DOWNLOADS_METADATA_FILE = path.join(DOWNLOAD_STORAGE_ROOT, 'downloads_metadata.json');
+
+const DOWNLOAD_MODE = {
+  DOWNLOAD_ONLY: 'download-only',
+  DL_IMPORT: 'dl-import'
+};
+
 // ダウンロードフォルダを取得（Windows/Mac/Linux対応）
 function getDownloadsFolder() {
   // Windowsの場合、shell:downloadsを解決
@@ -149,6 +172,19 @@ try {
   }
   if (!fs.existsSync(TEMP_PACKAGE_DIR)) {
     fs.mkdirSync(TEMP_PACKAGE_DIR, { recursive: true });
+  }
+  if (!fs.existsSync(DOWNLOAD_STORAGE_ROOT)) {
+    fs.mkdirSync(DOWNLOAD_STORAGE_ROOT, { recursive: true });
+  }
+  if (!fs.existsSync(SAVED_DOWNLOADS_DIR)) {
+    fs.mkdirSync(SAVED_DOWNLOADS_DIR, { recursive: true });
+  }
+  if (!fs.existsSync(DOWNLOADS_METADATA_FILE)) {
+    const initialMetadata = {
+      version: '1.1.0-beta',
+      downloads: []
+    };
+    fs.writeFileSync(DOWNLOADS_METADATA_FILE, JSON.stringify(initialMetadata, null, 2), 'utf-8');
   }
 } catch (e) {
   logError('ディレクトリ作成エラー:', e.message);
@@ -475,6 +511,171 @@ let watchedFiles = new Set();
 
 // ダウンロード追跡マップ: filename → { boothId, downloadId, timestamp }
 const downloadTrackingMap = new Map();
+const downloadModeMap = new Map(); // normalizedUrl → [ { assetId, label, mode, isMaterial, timestamp } ]
+const activeDownloadModeByFilename = new Map(); // filename → mode info
+
+function normalizeDownloadUrl(url) {
+  if (!url) return '';
+  return url.split('?')[0];
+}
+
+function registerDownloadMode(payload) {
+  if (!payload || !payload.downloadUrl) {
+    return;
+  }
+
+  const normalized = normalizeDownloadUrl(payload.downloadUrl);
+  if (!downloadModeMap.has(normalized)) {
+    downloadModeMap.set(normalized, []);
+  }
+
+  const queue = downloadModeMap.get(normalized);
+  queue.push({
+    assetId: payload.assetId || '',
+    label: payload.label || '',
+    mode: payload.mode || DOWNLOAD_MODE.DL_IMPORT,
+    isMaterial: Boolean(payload.isMaterial),
+    timestamp: Date.now(),
+    originalUrl: payload.downloadUrl
+  });
+
+  cleanupDownloadModeMap();
+}
+
+function consumeDownloadModeEntry(url) {
+  if (!url) return null;
+
+  const normalized = normalizeDownloadUrl(url);
+  const queue = downloadModeMap.get(normalized);
+  if (!queue || queue.length === 0) {
+    return null;
+  }
+
+  const entry = queue.shift();
+  if (queue.length === 0) {
+    downloadModeMap.delete(normalized);
+  }
+  return entry;
+}
+
+function cleanupDownloadModeMap() {
+  const expiration = Date.now() - (2 * 60 * 60 * 1000); // 2時間
+  for (const [key, queue] of downloadModeMap.entries()) {
+    const filtered = queue.filter(entry => entry.timestamp >= expiration);
+    if (filtered.length > 0) {
+      downloadModeMap.set(key, filtered);
+    } else {
+      downloadModeMap.delete(key);
+    }
+  }
+}
+
+function ensureDirectory(dirPath) {
+  if (!fs.existsSync(dirPath)) {
+    fs.mkdirSync(dirPath, { recursive: true });
+  }
+}
+
+function getUniqueDestinationPath(directory, filename) {
+  const parsed = path.parse(filename);
+  let counter = 1;
+  let candidate = path.join(directory, filename);
+
+  while (fs.existsSync(candidate)) {
+    candidate = path.join(directory, `${parsed.name}(${counter})${parsed.ext}`);
+    counter++;
+  }
+
+  return candidate;
+}
+
+function readDownloadMetadata() {
+  try {
+    const raw = fs.readFileSync(DOWNLOADS_METADATA_FILE, 'utf-8');
+    const data = JSON.parse(raw);
+    if (!Array.isArray(data.downloads)) {
+      data.downloads = [];
+    }
+    if (!data.version) {
+      data.version = '1.1.0-beta';
+    }
+    return data;
+  } catch (error) {
+    logWarn('メタデータ読み込み失敗:', error.message);
+    return {
+      version: '1.1.0-beta',
+      downloads: []
+    };
+  }
+}
+
+function upsertDownloadMetadata(entry) {
+  const metadata = readDownloadMetadata();
+  metadata.downloads = metadata.downloads.filter(item => {
+    return !(item.assetId === entry.assetId &&
+      item.label === entry.label &&
+      Boolean(item.isMaterial) === Boolean(entry.isMaterial));
+  });
+  metadata.downloads.push(entry);
+
+  try {
+    fs.writeFileSync(DOWNLOADS_METADATA_FILE, JSON.stringify(metadata, null, 2), 'utf-8');
+  } catch (error) {
+    logError('メタデータ保存エラー:', error.message);
+  }
+}
+
+async function saveDownloadedZip(zipPath, filename, modeInfo, trackingInfo) {
+  try {
+    if (!fs.existsSync(zipPath)) {
+      logWarn('ZIPファイルが見つかりません:', zipPath);
+      return;
+    }
+
+    const assetId = (modeInfo && modeInfo.assetId) || (trackingInfo && trackingInfo.boothId) || 'unknown_asset';
+    const label = (modeInfo && modeInfo.label) || filename;
+    const isMaterial = Boolean(modeInfo && modeInfo.isMaterial);
+
+    const assetDirectory = path.join(SAVED_DOWNLOADS_DIR, assetId);
+    ensureDirectory(assetDirectory);
+
+    const destinationPath = getUniqueDestinationPath(assetDirectory, filename);
+
+    try {
+      fs.renameSync(zipPath, destinationPath);
+    } catch (renameError) {
+      fs.copyFileSync(zipPath, destinationPath);
+      fs.unlinkSync(zipPath);
+    }
+
+    const metadataEntry = {
+      assetId,
+      label,
+      zipFilePath: destinationPath.replace(/\\/g, '/'),
+      originalFileName: path.basename(destinationPath),
+      downloadedAt: new Date().toISOString(),
+      isMaterial
+    };
+
+    upsertDownloadMetadata(metadataEntry);
+    logInfo('ZIPを保存しました:', metadataEntry.originalFileName);
+  } catch (error) {
+    logError('ZIP保存処理エラー:', error.message);
+  }
+}
+
+function clearDownloadContext(filename, tracking) {
+  activeDownloadModeByFilename.delete(filename);
+  downloadTrackingMap.delete(filename);
+  watchedFiles.delete(filename);
+
+  if (tracking && tracking.url) {
+    const normalized = normalizeDownloadUrl(tracking.url);
+    if (downloadModeMap.has(normalized) && downloadModeMap.get(normalized).length === 0) {
+      downloadModeMap.delete(normalized);
+    }
+  }
+}
 
 function watchDownloadsFolder() {
   if (!fs.existsSync(DOWNLOADS_DIR)) {
@@ -499,16 +700,31 @@ function watchDownloadsFolder() {
       
       const zipPath = path.join(DOWNLOADS_DIR, filename);
       
-      // ファイル存在確認
+      const trackingInfo = downloadTrackingMap.get(filename);
+      
       if (!fs.existsSync(zipPath)) {
-        watchedFiles.delete(filename);
+        clearDownloadContext(filename, trackingInfo);
         return;
       }
+
+      let modeInfo = activeDownloadModeByFilename.get(filename);
+      if (!modeInfo && trackingInfo && trackingInfo.url) {
+        modeInfo = consumeDownloadModeEntry(trackingInfo.url);
+      }
+
+      const mode = modeInfo ? modeInfo.mode : DOWNLOAD_MODE.DL_IMPORT;
       
-      // ZIP展開
-      await extractAndImportZip(zipPath, filename);
-      
-      watchedFiles.delete(filename);
+      try {
+        if (mode === DOWNLOAD_MODE.DOWNLOAD_ONLY) {
+          await saveDownloadedZip(zipPath, filename, modeInfo, trackingInfo);
+        } else {
+          await extractAndImportZip(zipPath, filename);
+        }
+      } catch (error) {
+        logError('ダウンロード処理エラー:', error.message);
+      } finally {
+        clearDownloadContext(filename, trackingInfo);
+      }
     });
   } catch (e) {
     logError('ダウンロードフォルダ監視設定エラー:', e.message);
@@ -611,6 +827,23 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ success: false, error: e.message }));
       }
     });
+  } else if (req.method === 'POST' && req.url === '/download-mode') {
+    let body = '';
+    req.on('data', chunk => {
+      body += chunk.toString();
+    });
+    req.on('end', () => {
+      try {
+        const data = JSON.parse(body || '{}');
+        registerDownloadMode(data);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true }));
+      } catch (error) {
+        logError('ダウンロードモード登録エラー:', error.message);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: error.message }));
+      }
+    });
   } else if (req.method === 'POST' && req.url === '/download-notify') {
     // Chrome拡張からダウンロード通知を受信
     let body = '';
@@ -625,18 +858,25 @@ const server = http.createServer(async (req, res) => {
         
         // ファイル名と商品IDを紐付け
         if (data.filename && (data.boothId || data.downloadId)) {
-          downloadTrackingMap.set(data.filename, {
+          const normalizedFilename = data.filename;
+          downloadTrackingMap.set(normalizedFilename, {
             boothId: data.boothId,
             downloadId: data.downloadId,
             url: data.url,
             timestamp: data.timestamp || Date.now()
           });
           
+          const modeEntry = consumeDownloadModeEntry(data.url);
+          if (modeEntry) {
+            activeDownloadModeByFilename.set(normalizedFilename, modeEntry);
+          }
+          
           // 古いエントリを削除（1時間以上前）
           const oneHourAgo = Date.now() - 60 * 60 * 1000;
           for (const [key, value] of downloadTrackingMap.entries()) {
             if (value.timestamp < oneHourAgo) {
               downloadTrackingMap.delete(key);
+              activeDownloadModeByFilename.delete(key);
             }
           }
         }

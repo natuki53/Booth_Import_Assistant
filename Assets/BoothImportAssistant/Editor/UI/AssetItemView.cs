@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEditor;
 using UnityEngine;
 using BoothImportAssistant.Models;
@@ -75,6 +76,13 @@ namespace BoothImportAssistant.UI
             {
                 GUILayout.Label("✅ インポート済み", EditorStyles.miniLabel);
             }
+
+            EditorGUILayout.Space(4);
+            Rect dividerRect = EditorGUILayout.GetControlRect(false, 1);
+            GUI.Box(dividerRect, GUIContent.none, GUI.skin.horizontalSlider);
+            EditorGUILayout.Space(4);
+
+            DrawDownloadStatus(asset);
             
             EditorGUILayout.EndVertical();
         }
@@ -135,36 +143,34 @@ namespace BoothImportAssistant.UI
 
         private void DrawDownloadButtons(BoothAsset asset)
         {
-            EditorGUILayout.BeginVertical(GUILayout.Width(180));
+            EditorGUILayout.BeginVertical(GUILayout.Width(220));
             
-            // ダウンロードボタン領域
             if (asset.downloadUrls != null && asset.downloadUrls.Length > 0)
             {
-                // アバター別とマテリアルを分類
-                List<int> avatarIndices = new List<int>();
-                List<int> materialIndices = new List<int>();
-                
-                for (int i = 0; i < asset.downloadUrls.Length; i++)
+                List<int> avatarIndices = GetAvatarIndices(asset);
+                List<int> materialIndices = GetMaterialIndices(asset);
+
+                if (avatarIndices.Count > 0)
                 {
-                    if (asset.downloadUrls[i].isMaterial)
-                    {
-                        materialIndices.Add(i);
-                    }
-                    else
-                    {
-                        avatarIndices.Add(i);
-                    }
+                    EditorGUILayout.BeginVertical(GUI.skin.box);
+                    GUILayout.Label("パッケージ", EditorStyles.boldLabel);
+                    EditorGUILayout.Space(2);
+                    DrawAvatarDownloadButtons(asset, avatarIndices);
+                    EditorGUILayout.EndVertical();
                 }
-                
-                // アバター別のダウンロード
-                DrawAvatarDownloadButtons(asset, avatarIndices);
-                
-                // マテリアルのダウンロード
-                DrawMaterialDownloadButtons(asset, materialIndices);
+
+                if (materialIndices.Count > 0)
+                {
+                    EditorGUILayout.Space(4);
+                    EditorGUILayout.BeginVertical(GUI.skin.box);
+                    GUILayout.Label("マテリアル", EditorStyles.boldLabel);
+                    EditorGUILayout.Space(2);
+                    DrawMaterialDownloadButtons(asset, materialIndices);
+                    EditorGUILayout.EndVertical();
+                }
             }
             else
             {
-                // ダウンロードリンクがない場合
                 if (GUILayout.Button("商品ページ", GUILayout.Height(26)))
                 {
                     Application.OpenURL(asset.productUrl);
@@ -178,53 +184,52 @@ namespace BoothImportAssistant.UI
         {
             if (avatarIndices.Count == 0) return;
 
-            if (avatarIndices.Count == 1)
+            int popupIndex = Mathf.Clamp(presenter.GetSelectedDownloadIndex(asset.id), 0, Mathf.Max(avatarIndices.Count - 1, 0));
+            int actualIndex = avatarIndices[popupIndex];
+
+            if (avatarIndices.Count > 1)
             {
-                // 単一アバター
-                if (GUILayout.Button("ダウンロード & インポート", GUILayout.Height(26)))
+                string[] options = avatarIndices
+                    .Select(i =>
+                    {
+                        string label = asset.downloadUrls[i].label ?? $"オプション {i + 1}";
+                        return label.Length > 35 ? label.Substring(0, 32) + "..." : label;
+                    })
+                    .ToArray();
+
+                int newIndex = EditorGUILayout.Popup(popupIndex, options, GUILayout.Width(210));
+                presenter.SetSelectedDownloadIndex(asset.id, Mathf.Clamp(newIndex, 0, avatarIndices.Count - 1));
+                actualIndex = avatarIndices[presenter.GetSelectedDownloadIndex(asset.id)];
+            }
+
+            bool hasSavedFile = presenter.HasSavedFile(asset, actualIndex);
+            DownloadUrl downloadInfo = (asset.downloadUrls != null && actualIndex >= 0 && actualIndex < asset.downloadUrls.Length)
+                ? asset.downloadUrls[actualIndex]
+                : null;
+            bool canOverwrite = downloadInfo != null && !string.IsNullOrEmpty(downloadInfo.url);
+
+            EditorGUILayout.BeginHorizontal();
+            if (!hasSavedFile)
+            {
+                if (GUILayout.Button("ダウンロードのみ", GUILayout.Height(24)))
                 {
-                    presenter.DownloadAsset(asset, avatarIndices[0]);
+                    presenter.DownloadOnly(asset, actualIndex);
+                }
+                if (GUILayout.Button("DL & インポート", GUILayout.Height(24)))
+                {
+                    presenter.DownloadAsset(asset, actualIndex);
                 }
             }
             else
             {
-                // 複数アバター：プルダウンメニュー
-                string[] options = new string[avatarIndices.Count];
-                for (int i = 0; i < avatarIndices.Count; i++)
+                if (GUILayout.Button("インポート", GUILayout.Height(24)))
                 {
-                    string label = asset.downloadUrls[avatarIndices[i]].label;
-                    if (label.Length > 35)
-                    {
-                        label = label.Substring(0, 32) + "...";
-                    }
-                    options[i] = label;
-                }
-                
-                // ドロップダウンで選択
-                int selectedIndex = presenter.GetSelectedDownloadIndex(asset.id);
-                selectedIndex = EditorGUILayout.Popup(
-                    selectedIndex, 
-                    options,
-                    GUILayout.Width(180)
-                );
-                
-                // 範囲チェック
-                if (selectedIndex >= 0 && selectedIndex < avatarIndices.Count)
-                {
-                    presenter.SetSelectedDownloadIndex(asset.id, selectedIndex);
-                }
-                else
-                {
-                    presenter.SetSelectedDownloadIndex(asset.id, 0);
-                }
-                
-                // 選択したアバターをダウンロード
-                if (GUILayout.Button("ダウンロード & インポート", GUILayout.Height(24)))
-                {
-                    int actualIndex = avatarIndices[presenter.GetSelectedDownloadIndex(asset.id)];
-                    presenter.DownloadAsset(asset, actualIndex);
+                    presenter.ImportFromSavedFile(asset, actualIndex);
                 }
             }
+
+            DrawMoreOptionsMenu(asset, actualIndex, canOverwrite);
+            EditorGUILayout.EndHorizontal();
         }
 
         private void DrawMaterialDownloadButtons(BoothAsset asset, List<int> materialIndices)
@@ -234,14 +239,152 @@ namespace BoothImportAssistant.UI
             int materialCount = 1;
             foreach (int index in materialIndices)
             {
-                // マテリアルボタン（統一ラベル）
-                string buttonLabel = materialIndices.Count > 1 ? $"マテリアル インポート {materialCount}" : "マテリアル インポート";
-                if (GUILayout.Button(buttonLabel, GUILayout.Height(24)))
+                bool hasSavedFile = presenter.HasSavedFile(asset, index);
+                DownloadUrl downloadInfo = (asset.downloadUrls != null && index >= 0 && index < asset.downloadUrls.Length)
+                    ? asset.downloadUrls[index]
+                    : null;
+                bool canOverwrite = downloadInfo != null && !string.IsNullOrEmpty(downloadInfo.url);
+
+                EditorGUILayout.BeginHorizontal();
+                if (!hasSavedFile)
                 {
-                    presenter.DownloadAsset(asset, index);
+                    if (GUILayout.Button("ダウンロードのみ", GUILayout.Height(24)))
+                    {
+                        presenter.DownloadOnly(asset, index);
+                    }
+                    if (GUILayout.Button("DL & インポート", GUILayout.Height(24)))
+                    {
+                        presenter.DownloadAsset(asset, index);
+                    }
                 }
+                else
+                {
+                    if (GUILayout.Button("インポート", GUILayout.Height(24)))
+                    {
+                        presenter.ImportFromSavedFile(asset, index);
+                    }
+                }
+
+                DrawMoreOptionsMenu(asset, index, canOverwrite);
+                EditorGUILayout.EndHorizontal();
+
+                if (materialCount < materialIndices.Count)
+                {
+                    EditorGUILayout.Space(4);
+                }
+
                 materialCount++;
             }
+        }
+
+        private void DrawMoreOptionsMenu(BoothAsset asset, int downloadIndex, bool canOverwrite)
+        {
+            Rect buttonRect = GUILayoutUtility.GetRect(new GUIContent("・・・"), GUI.skin.button, GUILayout.Width(32), GUILayout.Height(24));
+            if (GUI.Button(buttonRect, "・・・"))
+            {
+                GenericMenu menu = new GenericMenu();
+                menu.AddItem(new GUIContent("保存先ディレクトリを開く"), false, () => presenter.OpenDownloadFolder(asset));
+                if (canOverwrite)
+                {
+                    menu.AddItem(new GUIContent("上書きダウンロード"), false, () => presenter.OverwriteDownload(asset, downloadIndex));
+                }
+                else
+                {
+                    menu.AddDisabledItem(new GUIContent("上書きダウンロード"));
+                }
+                menu.DropDown(buttonRect);
+            }
+        }
+
+        private void DrawDownloadStatus(BoothAsset asset)
+        {
+            var status = presenter.GetDownloadStatus(asset);
+            string statusText;
+
+            if (status.total <= 0)
+            {
+                statusText = "ダウンロード状態：未ダウンロード";
+            }
+            else if (status.total == 1 && status.downloaded == 1)
+            {
+                statusText = "ダウンロード状態：ダウンロード済み";
+            }
+            else if (status.downloaded <= 0)
+            {
+                statusText = "ダウンロード状態：未ダウンロード";
+            }
+            else if (status.downloaded >= status.total)
+            {
+                statusText = $"ダウンロード状態：ダウンロード済み({status.downloaded}/{status.total})";
+            }
+            else
+            {
+                statusText = $"ダウンロード状態：ダウンロード済み({status.downloaded}/{status.total})";
+            }
+
+            GUILayout.Label(statusText, EditorStyles.miniLabel);
+
+            List<int> avatarIndices = GetAvatarIndices(asset);
+            if (avatarIndices.Count > 1)
+            {
+                int popupIndex = Mathf.Clamp(presenter.GetSelectedDownloadIndex(asset.id), 0, avatarIndices.Count - 1);
+                int actualIndex = avatarIndices[popupIndex];
+                bool isDownloaded = presenter.IsSelectedFileDownloaded(asset, actualIndex);
+                string selectedText = $"選択中のファイル：{(isDownloaded ? "ダウンロード済み" : "未ダウンロード")}";
+                GUILayout.Label(selectedText, EditorStyles.miniLabel);
+            }
+
+            var materialStatus = presenter.GetMaterialDownloadStatus(asset);
+            if (materialStatus.Count > 0)
+            {
+                if (materialStatus.Count == 1)
+                {
+                    string materialText = $"マテリアル：{(materialStatus[0] ? "ダウンロード済み" : "未ダウンロード")}";
+                    GUILayout.Label(materialText, EditorStyles.miniLabel);
+                }
+                else
+                {
+                    List<string> parts = new List<string>();
+                    for (int i = 0; i < materialStatus.Count; i++)
+                    {
+                        string label = materialStatus[i] ? "ダウンロード済み" : "未ダウンロード";
+                        parts.Add($"{label}({i + 1})");
+                    }
+                    GUILayout.Label("マテリアル：" + string.Join(" ", parts), EditorStyles.miniLabel);
+                }
+            }
+        }
+
+        private static List<int> GetAvatarIndices(BoothAsset asset)
+        {
+            List<int> indices = new List<int>();
+            if (asset?.downloadUrls == null) return indices;
+
+            for (int i = 0; i < asset.downloadUrls.Length; i++)
+            {
+                if (!asset.downloadUrls[i].isMaterial)
+                {
+                    indices.Add(i);
+                }
+            }
+
+            return indices;
+        }
+
+        private static List<int> GetMaterialIndices(BoothAsset asset)
+        {
+            List<int> indices = new List<int>();
+            if (asset?.downloadUrls == null) return indices;
+
+            for (int i = 0; i < asset.downloadUrls.Length; i++)
+            {
+                if (asset.downloadUrls[i].isMaterial)
+                {
+                    indices.Add(i);
+                }
+            }
+
+            return indices;
         }
     }
 }
